@@ -35,13 +35,17 @@ OpsDesk API is a production-style .NET 10 backend for an internal support and op
 ## Architecture
 
 ```mermaid
-flowchart TD
+flowchart LR
     Client["Client / Swagger"] --> Api["OpsDesk.Api"]
     Api --> Application["OpsDesk.Application"]
-    Application --> Domain["OpsDesk.Domain"]
     Api --> Infrastructure["OpsDesk.Infrastructure"]
+    Infrastructure --> Application
+    Application --> Domain["OpsDesk.Domain"]
+    Infrastructure --> Domain
     Infrastructure --> Database["PostgreSQL"]
 ```
+
+The projects are sibling directories under `src`; the arrows represent project/code dependencies, not folder nesting. `OpsDesk.Domain` is the independent core, `OpsDesk.Application` uses domain types, and `OpsDesk.Infrastructure` implements application interfaces with technical services such as EF Core, PostgreSQL, JWT generation, and password hashing.
 
 ```text
 src/OpsDesk.Api             HTTP endpoints, middleware, Swagger
