@@ -1,0 +1,24 @@
+﻿using Microsoft.EntityFrameworkCore;
+using OpsDesk.Domain.Entities;
+
+namespace OpsDesk.Infrastructure.Persistence;
+
+public sealed class OpsDeskDbContext : DbContext
+{
+    public OpsDeskDbContext(
+        DbContextOptions<OpsDeskDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<User> Users => Set<User>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(OpsDeskDbContext).Assembly);
+    }
+
+}
