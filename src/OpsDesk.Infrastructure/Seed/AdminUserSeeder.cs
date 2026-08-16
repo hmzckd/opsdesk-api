@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpsDesk.Application.Auth.Interfaces;
+using OpsDesk.Application.Auth.Services;
 using OpsDesk.Domain.Entities;
 using OpsDesk.Domain.Enums;
 using OpsDesk.Infrastructure.Persistence;
@@ -44,16 +45,18 @@ public sealed class AdminUserSeeder
             return;
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(
-            _settings.FirstName);
+        string firstName = UserInputNormalizer.NormalizeName(
+            _settings.FirstName,
+            nameof(_settings.FirstName));
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(
-            _settings.LastName);
+        string lastName = UserInputNormalizer.NormalizeName(
+            _settings.LastName,
+            nameof(_settings.LastName));
 
         _emailValidator.Validate(_settings.Email);
 
         string normalizedEmail =
-            _settings.Email.Trim().ToLowerInvariant();
+            UserInputNormalizer.NormalizeEmail(_settings.Email);
 
         User? existingUser = await _dbContext.Users
             .AsNoTracking()
@@ -81,8 +84,8 @@ public sealed class AdminUserSeeder
 
         var admin = new User
         {
-            FirstName = _settings.FirstName.Trim(),
-            LastName = _settings.LastName.Trim(),
+            FirstName = firstName,
+            LastName = lastName,
             Email = normalizedEmail,
             PasswordHash = _passwordHasher.HashPassword(
                 _settings.Password),

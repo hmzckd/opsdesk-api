@@ -6,7 +6,8 @@ services:
     container_name: opsdesk-api
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=opsdesk;Username=opsdesk;Password=opsdesk
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=opsdesk;Username=opsdesk;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
     ports:
       - "8080:8080"
     depends_on:
@@ -19,7 +20,7 @@ services:
     environment:
       POSTGRES_DB: opsdesk
       POSTGRES_USER: opsdesk
-      POSTGRES_PASSWORD: opsdesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
       - "5432:5432"
     healthcheck:

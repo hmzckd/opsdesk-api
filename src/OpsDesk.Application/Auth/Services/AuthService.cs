@@ -37,15 +37,22 @@ public sealed class AuthService : IAuthService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentException.ThrowIfNullOrWhiteSpace(request.FirstName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(request.LastName);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Email);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Password);
 
         _emailValidator.Validate(request.Email);
         _passwordValidator.Validate(request.Password);
 
-        string normalizedEmail = NormalizeEmail(request.Email);
+        string firstName = UserInputNormalizer.NormalizeName(
+            request.FirstName,
+            nameof(request.FirstName));
+
+        string lastName = UserInputNormalizer.NormalizeName(
+            request.LastName,
+            nameof(request.LastName));
+
+        string normalizedEmail =
+            UserInputNormalizer.NormalizeEmail(request.Email);
 
         bool emailExists = await _userRepository.ExistsByEmailAsync(
             normalizedEmail,
@@ -59,8 +66,8 @@ public sealed class AuthService : IAuthService
 
         var user = new User
         {
-            FirstName = request.FirstName.Trim(),
-            LastName = request.LastName.Trim(),
+            FirstName = firstName,
+            LastName = lastName,
             Email = normalizedEmail,
             PasswordHash = _passwordHasher.HashPassword(request.Password),
             Role = UserRole.Customer
@@ -81,7 +88,8 @@ public sealed class AuthService : IAuthService
 
         _emailValidator.Validate(request.Email);
 
-        string normalizedEmail = NormalizeEmail(request.Email);
+        string normalizedEmail =
+            UserInputNormalizer.NormalizeEmail(request.Email);
 
         User? user = await _userRepository.GetByEmailAsync(
             normalizedEmail,
@@ -112,10 +120,5 @@ public sealed class AuthService : IAuthService
             user.Role.ToString(),
             token.AccessToken,
             token.ExpiresAtUtc);
-    }
-
-    private static string NormalizeEmail(string email)
-    {
-        return email.Trim().ToLowerInvariant();
     }
 }

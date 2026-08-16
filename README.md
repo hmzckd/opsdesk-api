@@ -70,6 +70,12 @@ tests/OpsDesk.Tests         Unit and API integration tests
 
 Requirements: .NET 10 SDK, Docker Desktop, and Git.
 
+Create the local environment file. The committed example contains development-only values; deployed environments must provide their own secrets:
+
+```powershell
+Copy-Item .env.example .env
+```
+
 Start PostgreSQL:
 
 ```powershell
@@ -82,13 +88,19 @@ Restore packages:
 dotnet restore OpsDesk.sln --configfile NuGet.Config
 ```
 
+Store the local PostgreSQL connection string outside source control:
+
+```powershell
+dotnet user-secrets set ConnectionStrings:DefaultConnection "Host=localhost;Port=5432;Database=opsdesk;Username=opsdesk;Password=opsdesk" --project src/OpsDesk.Api
+```
+
 Set a development JWT signing key:
 
 ```powershell
 dotnet user-secrets set Jwt:SecretKey OpsDeskDevelopmentSecretKey!2026-ChangeMe --project src/OpsDesk.Api
 ```
 
-Apply the database migration:
+Development startup applies pending migrations automatically. You can still apply them explicitly without starting the API:
 
 ```powershell
 dotnet ef database update --project src/OpsDesk.Infrastructure --startup-project src/OpsDesk.Api
@@ -101,6 +113,14 @@ dotnet run --project src/OpsDesk.Api
 ```
 
 Open `http://localhost:5044/swagger` or use the URL printed by `dotnet run`.
+
+To run both PostgreSQL and the API through Docker Compose:
+
+```powershell
+docker compose up --build
+```
+
+Then open `http://localhost:8080/swagger`.
 
 ## Development Admin Seed
 
@@ -159,7 +179,7 @@ A successful register or login response includes the user identity, role, access
 dotnet test OpsDesk.sln
 ```
 
-V1 contains 18 tests covering validators, registration, login, duplicate email handling, JWT-protected identity, admin seeding, and role-based access. API integration tests start the real ASP.NET Core application in memory through `WebApplicationFactory`, replace PostgreSQL with a disposable InMemory database, and send HTTP requests through a test client.
+V1 tests cover validators, input normalization, registration, login, duplicate email handling, JWT-protected identity, admin seeding, and role-based access. API integration tests start the real ASP.NET Core application in memory through `WebApplicationFactory`, replace PostgreSQL with a disposable InMemory database, and send HTTP requests through a test client.
 
 The current InMemory tests validate application behavior but do not reproduce every PostgreSQL-specific behavior. A future testing milestone will add **Testcontainers for PostgreSQL** so migrations, constraints, and repository behavior can be verified against a real disposable database container.
 

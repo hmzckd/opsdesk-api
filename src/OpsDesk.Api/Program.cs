@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OpsDesk.Application.Auth.Interfaces;
@@ -11,6 +12,7 @@ using OpsDesk.Api.ErrorHandling;
 using OpsDesk.Infrastructure;
 using OpsDesk.Infrastructure.Seed;
 using OpsDesk.Infrastructure.Authentication;
+using OpsDesk.Infrastructure.Persistence;
 using OpsDesk.Application.Authorization;
 using OpsDesk.Domain.Enums;
 using Microsoft.Extensions.Options;
@@ -105,6 +107,14 @@ var app = builder.Build();
 
 using (IServiceScope scope = app.Services.CreateScope())
 {
+    OpsDeskDbContext dbContext = scope.ServiceProvider
+        .GetRequiredService<OpsDeskDbContext>();
+
+    if (app.Environment.IsDevelopment())
+    {
+        await dbContext.Database.MigrateAsync();
+    }
+
     AdminUserSeeder adminUserSeeder =
         scope.ServiceProvider
             .GetRequiredService<AdminUserSeeder>();

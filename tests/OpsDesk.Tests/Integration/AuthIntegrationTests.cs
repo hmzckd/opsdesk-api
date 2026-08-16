@@ -2,6 +2,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using OpsDesk.Application.Auth.DTOs;
+using OpsDesk.Application.Auth.Services;
 
 namespace OpsDesk.Tests.Integration;
 
@@ -67,6 +68,27 @@ public sealed class AuthIntegrationTests :
         Assert.Equal(
             HttpStatusCode.Conflict,
             duplicateResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Overlong_first_name_should_return_bad_request()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        var request = new RegisterRequest(
+            new string('A', UserInputNormalizer.MaximumNameLength + 1),
+            "Customer",
+            CreateEmail(),
+            "ValidPass!");
+
+        HttpResponseMessage response =
+            await client.PostAsJsonAsync(
+                "/auth/register",
+                request);
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
     }
 
     [Fact]

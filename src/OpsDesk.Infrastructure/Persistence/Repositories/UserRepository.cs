@@ -1,7 +1,9 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using OpsDesk.Application.Auth.Interfaces;
+using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Domain.Entities;
 
 namespace OpsDesk.Infrastructure.Persistence.Repositories;
@@ -43,7 +45,21 @@ public sealed class UserRepository : IUserRepository
             user,
             cancellationToken);
 
-        await _dbContext.SaveChangesAsync(
-            cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(
+                cancellationToken);
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "ux_users_email"
+            })
+        {
+            throw new ConflictException(
+                "A user with this email address already exists.",
+                exception);
+        }
     }
 }
