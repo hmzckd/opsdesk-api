@@ -110,7 +110,8 @@ using (IServiceScope scope = app.Services.CreateScope())
     OpsDeskDbContext dbContext = scope.ServiceProvider
         .GetRequiredService<OpsDeskDbContext>();
 
-    if (app.Environment.IsDevelopment())
+    if (app.Environment.IsDevelopment() ||
+        app.Environment.IsEnvironment("Testing"))
     {
         await dbContext.Database.MigrateAsync();
     }

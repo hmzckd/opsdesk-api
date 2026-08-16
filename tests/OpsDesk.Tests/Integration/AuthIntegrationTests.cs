@@ -6,14 +6,14 @@ using OpsDesk.Application.Auth.Services;
 
 namespace OpsDesk.Tests.Integration;
 
-public sealed class AuthIntegrationTests :
-    IClassFixture<OpsDeskApiFactory>
+[Collection(IntegrationTestCollection.Name)]
+public sealed class AuthIntegrationTests
 {
     private readonly OpsDeskApiFactory _factory;
 
-    public AuthIntegrationTests(OpsDeskApiFactory factory)
+    public AuthIntegrationTests(OpsDeskApiFixture fixture)
     {
-        _factory = factory;
+        _factory = fixture.Factory;
     }
 
     [Fact]

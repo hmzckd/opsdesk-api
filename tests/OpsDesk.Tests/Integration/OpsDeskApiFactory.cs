@@ -18,8 +18,15 @@ public sealed class OpsDeskApiFactory :
     public const string AdminPassword =
         "AdminTest!";
 
-    private readonly string _databaseName =
-        $"opsdesk-tests-{Guid.NewGuid()}";
+    private readonly string _connectionString;
+
+    public OpsDeskApiFactory(string connectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            connectionString);
+
+        _connectionString = connectionString;
+    }
 
     protected override void ConfigureWebHost(
         IWebHostBuilder builder)
@@ -33,7 +40,7 @@ public sealed class OpsDeskApiFactory :
                     new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:DefaultConnection"] =
-                            "Host=test",
+                            _connectionString,
                         ["Jwt:Issuer"] = "OpsDesk.Tests",
                         ["Jwt:Audience"] = "OpsDesk.Tests",
                         ["Jwt:SecretKey"] =
@@ -59,8 +66,8 @@ public sealed class OpsDeskApiFactory :
                     OpsDeskDbContext>>();
 
             services.AddDbContext<OpsDeskDbContext>(
-                options => options.UseInMemoryDatabase(
-                    _databaseName));
+                options => options.UseNpgsql(
+                    _connectionString));
         });
     }
 }

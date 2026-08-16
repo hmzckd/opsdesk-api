@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/hmzckd/opsdesk-api/actions/workflows/ci.yml/badge.svg)](https://github.com/hmzckd/opsdesk-api/actions/workflows/ci.yml)
 
-OpsDesk API is a production-style .NET 10 backend for an internal support and operations desk. The current V1 release provides secure user authentication, role-based authorization, PostgreSQL persistence, API documentation, admin seeding, and automated tests.
+OpsDesk API is a production-style .NET 10 backend for an internal support and operations desk. The current V1.1 release provides secure user authentication, role-based authorization, PostgreSQL persistence, API documentation, admin seeding, and automated tests against a disposable PostgreSQL database.
 
-## V1 Features
+## V1.1 Features
 
 - Customer registration and login
 - Password hashing with ASP.NET Core Identity
@@ -18,6 +18,8 @@ OpsDesk API is a production-style .NET 10 backend for an internal support and op
 - Swagger UI with Bearer-token support
 - Health-check endpoint
 - Unit and API integration tests
+- PostgreSQL Testcontainers migration and constraint tests
+- Cobertura coverage reports in GitHub Actions
 - Docker Compose development environment
 - GitHub Actions build and test workflow
 
@@ -28,7 +30,7 @@ OpsDesk API is a production-style .NET 10 backend for an internal support and op
 - PostgreSQL 16 and Npgsql
 - JWT Bearer authentication
 - xUnit and `WebApplicationFactory`
-- EF Core InMemory provider for isolated API tests
+- Testcontainers for disposable PostgreSQL integration tests
 - Swashbuckle / Swagger UI
 - Docker Compose
 
@@ -175,13 +177,19 @@ A successful register or login response includes the user identity, role, access
 
 ## Tests
 
+Docker Desktop must be running because the integration-test fixture starts a temporary PostgreSQL 16 container. The container is shared by the integration-test collection and removed automatically after the test run.
+
 ```powershell
 dotnet test OpsDesk.sln
 ```
 
-V1 tests cover validators, input normalization, registration, login, duplicate email handling, JWT-protected identity, admin seeding, and role-based access. API integration tests start the real ASP.NET Core application in memory through `WebApplicationFactory`, replace PostgreSQL with a disposable InMemory database, and send HTTP requests through a test client.
+To generate a local Cobertura coverage report:
 
-The current InMemory tests validate application behavior but do not reproduce every PostgreSQL-specific behavior. A future testing milestone will add **Testcontainers for PostgreSQL** so migrations, constraints, and repository behavior can be verified against a real disposable database container.
+```powershell
+dotnet test OpsDesk.sln --collect:"XPlat Code Coverage" --results-directory TestResults
+```
+
+V1.1 contains 26 tests covering validators, input normalization, registration, login, JWT-protected identity, admin seeding, role-based access, EF Core migrations, the Npgsql provider, PostgreSQL unique constraints, and database-exception translation. `WebApplicationFactory` starts the real ASP.NET Core application while Testcontainers supplies the temporary PostgreSQL instance. GitHub Actions uploads `coverage.cobertura.xml` as the `coverage-report` artifact.
 
 ## Design Decisions
 
@@ -195,7 +203,6 @@ The current InMemory tests validate application behavior but do not reproduce ev
 
 ## Roadmap
 
-- `V1.1`: PostgreSQL Testcontainers integration tests and test coverage reporting
 - `V2`: Ticket lifecycle, comments, assignment, filtering, and pagination
 - `V3`: SLA policies, audit logs, approvals, and background jobs
 - `V4`: Human-approved .NET AI triage and summarization
