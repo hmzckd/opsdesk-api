@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpsDesk.Application.Auth.Interfaces;
+using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Infrastructure.Authentication;
 using OpsDesk.Infrastructure.Persistence;
 using OpsDesk.Infrastructure.Persistence.Repositories;
@@ -28,6 +29,7 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
 
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ITicketRepository, TicketRepository>();
         services.AddScoped<AdminUserSeeder>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();

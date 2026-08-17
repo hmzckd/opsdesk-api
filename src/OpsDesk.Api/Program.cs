@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Auth.Services;
+using OpsDesk.Application.Tickets.Interfaces;
+using OpsDesk.Application.Tickets.Services;
 using OpsDesk.Api.ErrorHandling;
 using OpsDesk.Infrastructure;
 using OpsDesk.Infrastructure.Seed;
@@ -21,9 +24,18 @@ var builder = WebApplication.CreateBuilder(args);
 
 
 builder.Services.AddHealthChecks();
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(
+            new JsonStringEnumConverter(
+                JsonNamingPolicy.SnakeCaseLower,
+                allowIntegerValues: false));
+    });
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 

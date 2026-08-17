@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Common.Exceptions;
+using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Entities;
 using OpsDesk.Infrastructure.Persistence;
 
@@ -18,7 +19,7 @@ public sealed class PostgreSqlIntegrationTests
     }
 
     [Fact]
-    public async Task Initial_migration_should_be_applied_to_postgresql()
+    public async Task Expected_migrations_should_be_applied_to_postgresql()
     {
         await using AsyncServiceScope scope =
             _factory.Services.CreateAsyncScope();
@@ -40,6 +41,12 @@ public sealed class PostgreSqlIntegrationTests
             migration => migration.EndsWith(
                 "_InitialCreate",
                 StringComparison.Ordinal));
+
+        Assert.Contains(
+            appliedMigrations,
+            migration => migration.EndsWith(
+                "_AddTickets",
+                StringComparison.Ordinal));
     }
 
     [Fact]
@@ -58,6 +65,70 @@ public sealed class PostgreSqlIntegrationTests
 
         await Assert.ThrowsAsync<ConflictException>(() =>
             repository.AddAsync(CreateUser(email)));
+    }
+
+    /// <summary>
+    /// Verifies Ticket persistence against the real PostgreSQL provider.
+    /// </summary>
+    [Fact]
+    public async Task Ticket_should_be_persisted_to_postgresql()
+    {
+        await using AsyncServiceScope scope =
+            _factory.Services.CreateAsyncScope();
+
+        IUserRepository userRepository =
+            scope.ServiceProvider
+                .GetRequiredService<IUserRepository>();
+
+        ITicketRepository ticketRepository =
+            scope.ServiceProvider
+                .GetRequiredService<ITicketRepository>();
+
+        OpsDeskDbContext dbContext =
+            scope.ServiceProvider
+                .GetRequiredService<OpsDeskDbContext>();
+
+        User requester = CreateUser(
+            $"requester-{Guid.NewGuid():N}@example.com");
+
+        await userRepository.AddAsync(requester);
+
+        Ticket ticket = Ticket.Create(
+            requester.Id,
+            "Database integration test",
+            "This Ticket must be stored in PostgreSQL.");
+
+        await ticketRepository.AddAsync(ticket);
+
+        Ticket persistedTicket =
+            await dbContext.Tickets
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == ticket.Id);
+
+        Assert.Equal(requester.Id, persistedTicket.RequesterId);
+        Assert.Equal(ticket.Title, persistedTicket.Title);
+    }
+
+    /// <summary>
+    /// Verifies PostgreSQL rejects a Ticket with an unknown requester.
+    /// </summary>
+    [Fact]
+    public async Task Ticket_requester_foreign_key_should_be_enforced()
+    {
+        await using AsyncServiceScope scope =
+            _factory.Services.CreateAsyncScope();
+
+        ITicketRepository repository =
+            scope.ServiceProvider
+                .GetRequiredService<ITicketRepository>();
+
+        Ticket ticket = Ticket.Create(
+            Guid.NewGuid(),
+            "Unknown requester",
+            "The requester does not exist in the users table.");
+
+        await Assert.ThrowsAsync<DbUpdateException>(() =>
+            repository.AddAsync(ticket));
     }
 
     private static User CreateUser(string email)

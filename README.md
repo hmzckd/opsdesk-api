@@ -23,6 +23,14 @@ OpsDesk API is a production-style .NET 10 backend for an internal support and op
 - Docker Compose development environment
 - GitHub Actions build and test workflow
 
+## V2 Development
+
+- Authenticated `Customer`, `Agent`, and `Admin` users can create Tickets
+- Server-owned Ticket identity, requester, status, assignment, and UTC timestamps
+- `Low`, `Medium`, `High`, and `Urgent` priorities with `Medium` as the default
+- PostgreSQL Ticket persistence with requester and assignee foreign keys
+- Ticket creation validation and role coverage through API integration tests
+
 ## Tech Stack
 
 - .NET 10 and ASP.NET Core Web API
@@ -51,8 +59,8 @@ The projects are sibling directories under `src`; the arrows represent project/c
 
 ```text
 src/OpsDesk.Api             HTTP endpoints, middleware, Swagger
-src/OpsDesk.Application     Auth workflows, DTOs, interfaces, policies
-src/OpsDesk.Domain          User entity and roles
+src/OpsDesk.Application     Auth and Ticket workflows, DTOs, interfaces, policies
+src/OpsDesk.Domain          User and Ticket entities, roles, status, priority
 src/OpsDesk.Infrastructure  EF Core, PostgreSQL, JWT, hashing, seeding
 tests/OpsDesk.Tests         Unit and API integration tests
 ```
@@ -64,6 +72,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `POST` | `/auth/register` | Anonymous | Register a customer |
 | `POST` | `/auth/login` | Anonymous | Log in and receive a JWT |
 | `GET` | `/me` | Authenticated | Read the current token identity |
+| `POST` | `/tickets` | Authenticated | Create a Ticket for the current user |
 | `GET` | `/admin/access` | Admin | Verify the `AdminOnly` policy |
 | `GET` | `/health` | Anonymous | Check API process health |
 | `GET` | `/swagger` | Anonymous | Open interactive API documentation |
@@ -189,7 +198,7 @@ To generate a local Cobertura coverage report:
 dotnet test OpsDesk.sln --collect:"XPlat Code Coverage" --results-directory TestResults
 ```
 
-V1.1 contains 26 tests covering validators, input normalization, registration, login, JWT-protected identity, admin seeding, role-based access, EF Core migrations, the Npgsql provider, PostgreSQL unique constraints, and database-exception translation. `WebApplicationFactory` starts the real ASP.NET Core application while Testcontainers supplies the temporary PostgreSQL instance. GitHub Actions uploads `coverage.cobertura.xml` as the `coverage-report` artifact.
+The current test suite contains 40 tests covering validators, input normalization, registration, login, JWT-protected identity, admin seeding, role-based access, Ticket creation and validation, EF Core migrations, the Npgsql provider, PostgreSQL foreign-key and unique constraints, and database-exception translation. `WebApplicationFactory` starts the real ASP.NET Core application while Testcontainers supplies the temporary PostgreSQL instance. GitHub Actions uploads `coverage.cobertura.xml` as the `coverage-report` artifact.
 
 ## Design Decisions
 

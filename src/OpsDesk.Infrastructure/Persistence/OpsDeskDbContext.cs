@@ -13,6 +13,8 @@ public sealed class OpsDeskDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<Ticket> Tickets => Set<Ticket>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
