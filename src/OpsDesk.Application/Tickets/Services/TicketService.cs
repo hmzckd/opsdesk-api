@@ -1,6 +1,7 @@
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Entities;
+using OpsDesk.Domain.Enums;
 
 namespace OpsDesk.Application.Tickets.Services;
 
@@ -11,6 +12,41 @@ public sealed class TicketService : ITicketService
     public TicketService(ITicketRepository ticketRepository)
     {
         _ticketRepository = ticketRepository;
+    }
+
+    /// <summary>
+    /// Retrieves one Ticket and maps it to the public response contract.
+    /// </summary>
+    public async Task<TicketResponse?> GetByIdAsync(
+        Guid ticketId,
+        Guid viewerId,
+        UserRole viewerRole,
+        CancellationToken cancellationToken = default)
+    {
+        Ticket? ticket;
+
+        switch (viewerRole)
+        {
+            case UserRole.Customer:
+                ticket =
+                    await _ticketRepository.GetByIdForRequesterAsync(
+                        ticketId,
+                        viewerId,
+                        cancellationToken);
+                break;
+
+            case UserRole.Agent:
+            case UserRole.Admin:
+                ticket = await _ticketRepository.GetByIdAsync(
+                    ticketId,
+                    cancellationToken);
+                break;
+
+            default:
+                return null;
+        }
+
+        return ticket is null ? null : MapToResponse(ticket);
     }
 
     /// <summary>

@@ -2,34 +2,27 @@
 
 [![CI](https://github.com/hmzckd/opsdesk-api/actions/workflows/ci.yml/badge.svg)](https://github.com/hmzckd/opsdesk-api/actions/workflows/ci.yml)
 
-OpsDesk API is a production-style .NET 10 backend for an internal support and operations desk. The current V1.1 release provides secure user authentication, role-based authorization, PostgreSQL persistence, API documentation, admin seeding, and automated tests against a disposable PostgreSQL database.
+OpsDesk API is a production-style .NET 10 backend for an internal support and operations desk. Users can authenticate, create support Tickets, and retrieve Ticket details according to role-based visibility rules.
 
-## V1.1 Features
+## Capabilities
 
 - Customer registration and login
 - Password hashing with ASP.NET Core Identity
 - JWT access-token generation and validation
 - `Admin`, `Agent`, and `Customer` roles
-- Policy-based authorization for admin and support operations
-- Email and password validation
+- Policy-based authorization and Ticket visibility
+- Ticket creation with server-owned status, requester, and timestamps
+- Ticket detail access for the requester, Agents, and Admins
+- Email, password, and Ticket input validation
 - Idempotent admin-user seeding from local secrets
-- Standardized error responses with appropriate HTTP status codes
+- Standardized Problem Details error responses
 - PostgreSQL persistence with EF Core migrations
 - Swagger UI with Bearer-token support
 - Health-check endpoint
-- Unit and API integration tests
-- PostgreSQL Testcontainers migration and constraint tests
+- Unit, API, and PostgreSQL Testcontainers tests
 - Cobertura coverage reports in GitHub Actions
 - Docker Compose development environment
 - GitHub Actions build and test workflow
-
-## V2 Development
-
-- Authenticated `Customer`, `Agent`, and `Admin` users can create Tickets
-- Server-owned Ticket identity, requester, status, assignment, and UTC timestamps
-- `Low`, `Medium`, `High`, and `Urgent` priorities with `Medium` as the default
-- PostgreSQL Ticket persistence with requester and assignee foreign keys
-- Ticket creation validation and role coverage through API integration tests
 
 ## Tech Stack
 
@@ -45,17 +38,21 @@ OpsDesk API is a production-style .NET 10 backend for an internal support and op
 ## Architecture
 
 ```mermaid
-flowchart LR
-    Client["Client / Swagger"] --> Api["OpsDesk.Api"]
-    Api --> Application["OpsDesk.Application"]
-    Api --> Infrastructure["OpsDesk.Infrastructure"]
-    Infrastructure --> Application
-    Application --> Domain["OpsDesk.Domain"]
+flowchart TB
+    Client["API Client / Swagger UI"] --> Api["OpsDesk.Api<br/>Controllers, authentication, HTTP responses"]
+    Api --> Application["OpsDesk.Application<br/>Use cases, DTOs, interfaces, authorization decisions"]
+    Application --> Domain["OpsDesk.Domain<br/>Entities, enums, business rules"]
+
+    Api --> Infrastructure["OpsDesk.Infrastructure<br/>EF Core, JWT, hashing, seeding"]
+    Infrastructure -. "implements interfaces" .-> Application
     Infrastructure --> Domain
-    Infrastructure --> Database["PostgreSQL"]
+    Infrastructure --> Database[(PostgreSQL)]
+
+    Tests["OpsDesk.Tests<br/>xUnit, WebApplicationFactory, Testcontainers"] -. "exercises public API" .-> Api
+    Tests -. "temporary database" .-> Database
 ```
 
-The projects are sibling directories under `src`; the arrows represent project/code dependencies, not folder nesting. `OpsDesk.Domain` is the independent core, `OpsDesk.Application` uses domain types, and `OpsDesk.Infrastructure` implements application interfaces with technical services such as EF Core, PostgreSQL, JWT generation, and password hashing.
+The projects are sibling directories under `src`; the arrows represent code and runtime relationships, not folder nesting. `OpsDesk.Domain` is the independent core. `OpsDesk.Application` coordinates business use cases. `OpsDesk.Infrastructure` supplies technical implementations, and `OpsDesk.Api` exposes them through HTTP.
 
 ```text
 src/OpsDesk.Api             HTTP endpoints, middleware, Swagger
@@ -73,6 +70,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `POST` | `/auth/login` | Anonymous | Log in and receive a JWT |
 | `GET` | `/me` | Authenticated | Read the current token identity |
 | `POST` | `/tickets` | Authenticated | Create a Ticket for the current user |
+| `GET` | `/tickets/{id}` | Authenticated and visible | Read one Ticket without leaking protected Tickets |
 | `GET` | `/admin/access` | Admin | Verify the `AdminOnly` policy |
 | `GET` | `/health` | Anonymous | Check API process health |
 | `GET` | `/swagger` | Anonymous | Open interactive API documentation |
@@ -159,31 +157,6 @@ dotnet user-secrets set AdminSeed:Password Admin123! --project src/OpsDesk.Api
 
 These values are for local development only. Use a proper secret manager in deployed environments.
 
-## Example Authentication Flow
-
-Register:
-
-```http
-POST /auth/register
-Content-Type: application/json
-
-{
-  "firstName": "Hamza",
-  "lastName": "Test",
-  "email": "hamza@example.com",
-  "password": "ValidPass!"
-}
-```
-
-A successful register or login response includes the user identity, role, access token, and token expiration time. Add the token through Swagger's **Authorize** dialog or send it as `Authorization: Bearer <token>`.
-
-## Authorization
-
-- `AdminOnly` requires the JWT role claim to be `Admin`.
-- `AgentOrAdmin` accepts either `Agent` or `Admin` and is ready for V2 support workflows.
-- Missing authentication returns `401 Unauthorized`.
-- Authenticated users without the required role receive `403 Forbidden`.
-
 ## Tests
 
 Docker Desktop must be running because the integration-test fixture starts a temporary PostgreSQL 16 container. The container is shared by the integration-test collection and removed automatically after the test run.
@@ -198,7 +171,7 @@ To generate a local Cobertura coverage report:
 dotnet test OpsDesk.sln --collect:"XPlat Code Coverage" --results-directory TestResults
 ```
 
-The current test suite contains 40 tests covering validators, input normalization, registration, login, JWT-protected identity, admin seeding, role-based access, Ticket creation and validation, EF Core migrations, the Npgsql provider, PostgreSQL foreign-key and unique constraints, and database-exception translation. `WebApplicationFactory` starts the real ASP.NET Core application while Testcontainers supplies the temporary PostgreSQL instance. GitHub Actions uploads `coverage.cobertura.xml` as the `coverage-report` artifact.
+The test suite covers authentication, validation, authorization, Ticket behavior, EF Core migrations, PostgreSQL constraints, and HTTP contracts. `WebApplicationFactory` starts the real ASP.NET Core application while Testcontainers supplies a temporary PostgreSQL instance. GitHub Actions uploads `coverage.cobertura.xml` as the `coverage-report` artifact.
 
 ## Design Decisions
 
@@ -208,6 +181,8 @@ The current test suite contains 40 tests covering validators, input normalizatio
 - Registration always creates a `Customer`; elevated roles cannot be self-selected.
 - Admin seeding creates missing data but never silently promotes an existing user.
 - Named authorization policies keep role rules centralized and reusable.
+- Ticket visibility is decided in the Application layer and enforced by read-only database queries.
+- Customers receive `404 Not Found` for Tickets outside their visibility scope, preventing resource discovery.
 - Global exception handling maps expected failures to consistent API responses.
 
 ## Roadmap
