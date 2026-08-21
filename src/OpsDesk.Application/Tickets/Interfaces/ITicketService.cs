@@ -6,6 +6,16 @@ namespace OpsDesk.Application.Tickets.Interfaces;
 public interface ITicketService
 {
     /// <summary>
+    /// Changes one Ticket's status for an authenticated actor.
+    /// </summary>
+    Task<TicketResponse?> ChangeStatusAsync(
+        Guid ticketId,
+        Guid actorId,
+        UserRole actorRole,
+        ChangeTicketStatusRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves one Ticket for an authenticated User.
     /// </summary>
     Task<TicketResponse?> GetByIdAsync(

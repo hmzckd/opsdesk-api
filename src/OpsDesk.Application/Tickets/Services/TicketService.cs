@@ -1,3 +1,4 @@
+using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Entities;
@@ -12,6 +13,90 @@ public sealed class TicketService : ITicketService
     public TicketService(ITicketRepository ticketRepository)
     {
         _ticketRepository = ticketRepository;
+    }
+
+    /// <summary>
+    /// Authorizes and persists one Ticket status transition.
+    /// </summary>
+    public async Task<TicketResponse?> ChangeStatusAsync(
+        Guid ticketId,
+        Guid actorId,
+        UserRole actorRole,
+        ChangeTicketStatusRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        Ticket? ticket;
+
+        switch (actorRole)
+        {
+            case UserRole.Customer:
+                ticket =
+                    await _ticketRepository
+                        .GetForUpdateForRequesterAsync(
+                            ticketId,
+                            actorId,
+                            cancellationToken);
+                break;
+
+            case UserRole.Agent:
+            case UserRole.Admin:
+                ticket = await _ticketRepository.GetForUpdateAsync(
+                    ticketId,
+                    cancellationToken);
+                break;
+
+            default:
+                return null;
+        }
+
+        if (ticket is null)
+        {
+            return null;
+        }
+
+        bool customerCanChangeStatus =
+            ticket.Status == TicketStatus.Resolved &&
+            request.Status is
+                TicketStatus.InProgress or TicketStatus.Closed;
+
+        if (actorRole == UserRole.Customer &&
+            !customerCanChangeStatus)
+        {
+            throw new ForbiddenException(
+                "Customers can only reopen or close " +
+                "their own resolved tickets.");
+        }
+
+        TicketStatus previousStatus = ticket.Status;
+        DateTime changedAtUtc = DateTime.UtcNow;
+
+        try
+        {
+            ticket.ChangeStatus(request.Status, changedAtUtc);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new ConflictException(
+                exception.Message,
+                exception);
+        }
+
+        TicketStatusChange statusChange = TicketStatusChange.Create(
+            ticket.Id,
+            actorId,
+            previousStatus,
+            ticket.Status,
+            changedAtUtc);
+
+        await _ticketRepository.AddStatusChangeAsync(
+            statusChange,
+            cancellationToken);
+
+        await _ticketRepository.SaveChangesAsync(cancellationToken);
+
+        return MapToResponse(ticket);
     }
 
     /// <summary>

@@ -45,6 +45,54 @@ public sealed class TicketRepository : ITicketRepository
     }
 
     /// <summary>
+    /// Retrieves one Ticket with change tracking for a write operation.
+    /// </summary>
+    public Task<Ticket?> GetForUpdateAsync(
+        Guid ticketId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Tickets.SingleOrDefaultAsync(
+            ticket => ticket.Id == ticketId,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Retrieves one requester-owned Ticket with write tracking enabled.
+    /// </summary>
+    public Task<Ticket?> GetForUpdateForRequesterAsync(
+        Guid ticketId,
+        Guid requesterId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Tickets.SingleOrDefaultAsync(
+            ticket =>
+                ticket.Id == ticketId &&
+                ticket.RequesterId == requesterId,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Adds one status-change record to the EF Core change tracker.
+    /// </summary>
+    public async Task AddStatusChangeAsync(
+        TicketStatusChange statusChange,
+        CancellationToken cancellationToken = default)
+    {
+        await _dbContext.TicketStatusChanges.AddAsync(
+            statusChange,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Saves all tracked changes in the current DbContext scope.
+    /// </summary>
+    public Task SaveChangesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Adds a Ticket to the EF Core change tracker and saves it.
     /// </summary>
     public async Task AddAsync(

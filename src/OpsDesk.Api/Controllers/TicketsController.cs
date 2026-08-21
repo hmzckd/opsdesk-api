@@ -20,6 +20,48 @@ public sealed class TicketsController : ControllerBase
     }
 
     /// <summary>
+    /// Changes one Ticket's lifecycle status.
+    /// </summary>
+    [HttpPatch("{id:guid}/status")]
+    [ProducesResponseType<TicketResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TicketResponse>> ChangeStatus(
+        Guid id,
+        ChangeTicketStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        string? userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        string? userRoleClaim =
+            User.FindFirstValue(ClaimTypes.Role);
+
+        if (!Guid.TryParse(userIdClaim, out Guid actorId) ||
+            !Enum.TryParse(
+                userRoleClaim,
+                ignoreCase: true,
+                out UserRole actorRole) ||
+            !Enum.IsDefined(actorRole))
+        {
+            return Unauthorized();
+        }
+
+        TicketResponse? response =
+            await _ticketService.ChangeStatusAsync(
+                id,
+                actorId,
+                actorRole,
+                request,
+                cancellationToken);
+
+        return response is null ? NotFound() : Ok(response);
+    }
+
+    /// <summary>
     /// Retrieves one Ticket visible to the authenticated User.
     /// </summary>
     [HttpGet("{id:guid}")]

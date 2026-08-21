@@ -89,6 +89,66 @@ public sealed class Ticket
     }
 
     /// <summary>
+    /// Moves the Ticket to another valid lifecycle status.
+    /// </summary>
+    public void ChangeStatus(
+        TicketStatus newStatus,
+        DateTime changedAtUtc)
+    {
+        if (!Enum.IsDefined(newStatus))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(newStatus),
+                newStatus,
+                "Ticket status is not supported.");
+        }
+
+        if (changedAtUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException(
+                "Status change time must be UTC.",
+                nameof(changedAtUtc));
+        }
+
+        bool isAllowedTransition =
+            (Status == TicketStatus.Open &&
+                newStatus == TicketStatus.InProgress) ||
+            (Status == TicketStatus.InProgress &&
+                (newStatus == TicketStatus.WaitingCustomer ||
+                    newStatus == TicketStatus.Resolved)) ||
+            (Status == TicketStatus.WaitingCustomer &&
+                (newStatus == TicketStatus.InProgress ||
+                    newStatus == TicketStatus.Resolved)) ||
+            (Status == TicketStatus.Resolved &&
+                (newStatus == TicketStatus.InProgress ||
+                    newStatus == TicketStatus.Closed));
+
+        if (!isAllowedTransition)
+        {
+            throw new InvalidOperationException(
+                $"Ticket status cannot change from {Status} " +
+                $"to {newStatus}.");
+        }
+
+        Status = newStatus;
+        UpdatedAtUtc = changedAtUtc;
+
+        if (newStatus == TicketStatus.Resolved)
+        {
+            ResolvedAtUtc = changedAtUtc;
+        }
+        else if (newStatus == TicketStatus.InProgress)
+        {
+            ResolvedAtUtc = null;
+        }
+
+        if (newStatus == TicketStatus.Closed)
+        {
+            ClosedAtUtc = changedAtUtc;
+        }
+    }
+
+    /// <summary>
     /// Trims required text and enforces its maximum length.
     /// </summary>
     private static string NormalizeRequiredText(

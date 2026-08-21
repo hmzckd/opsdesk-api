@@ -4,6 +4,7 @@ using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Entities;
+using OpsDesk.Domain.Enums;
 using OpsDesk.Infrastructure.Persistence;
 
 namespace OpsDesk.Tests.Integration;
@@ -46,6 +47,12 @@ public sealed class PostgreSqlIntegrationTests
             appliedMigrations,
             migration => migration.EndsWith(
                 "_AddTickets",
+                StringComparison.Ordinal));
+
+        Assert.Contains(
+            appliedMigrations,
+            migration => migration.EndsWith(
+                "_AddTicketStatusChanges",
                 StringComparison.Ordinal));
     }
 
@@ -129,6 +136,74 @@ public sealed class PostgreSqlIntegrationTests
 
         await Assert.ThrowsAsync<DbUpdateException>(() =>
             repository.AddAsync(ticket));
+    }
+
+    /// <summary>
+    /// Verifies a failed history insert rolls back the Ticket update too.
+    /// </summary>
+    [Fact]
+    public async Task Status_change_should_be_atomic_in_postgresql()
+    {
+        Guid ticketId;
+
+        await using (AsyncServiceScope writeScope =
+            _factory.Services.CreateAsyncScope())
+        {
+            IUserRepository userRepository = writeScope.ServiceProvider
+                .GetRequiredService<IUserRepository>();
+            ITicketRepository ticketRepository = writeScope.ServiceProvider
+                .GetRequiredService<ITicketRepository>();
+
+            User requester = CreateUser(
+                $"atomic-{Guid.NewGuid():N}@example.com");
+            await userRepository.AddAsync(requester);
+
+            Ticket ticket = Ticket.Create(
+                requester.Id,
+                "Atomic status change",
+                "The Ticket update must roll back with its event.");
+            await ticketRepository.AddAsync(ticket);
+            ticketId = ticket.Id;
+
+            Ticket trackedTicket =
+                await ticketRepository.GetForUpdateAsync(ticket.Id)
+                ?? throw new InvalidOperationException(
+                    "Ticket was not found for update.");
+
+            DateTime changedAtUtc = DateTime.UtcNow;
+            trackedTicket.ChangeStatus(
+                TicketStatus.InProgress,
+                changedAtUtc);
+
+            TicketStatusChange invalidStatusChange =
+                TicketStatusChange.Create(
+                    ticket.Id,
+                    Guid.NewGuid(),
+                    TicketStatus.Open,
+                    TicketStatus.InProgress,
+                    changedAtUtc);
+
+            await ticketRepository.AddStatusChangeAsync(
+                invalidStatusChange);
+
+            await Assert.ThrowsAsync<DbUpdateException>(() =>
+                ticketRepository.SaveChangesAsync());
+        }
+
+        await using AsyncServiceScope readScope =
+            _factory.Services.CreateAsyncScope();
+        OpsDeskDbContext dbContext = readScope.ServiceProvider
+            .GetRequiredService<OpsDeskDbContext>();
+
+        Ticket persistedTicket = await dbContext.Tickets
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == ticketId);
+        int eventCount = await dbContext.TicketStatusChanges
+            .AsNoTracking()
+            .CountAsync(item => item.TicketId == ticketId);
+
+        Assert.Equal(TicketStatus.Open, persistedTicket.Status);
+        Assert.Equal(0, eventCount);
     }
 
     private static User CreateUser(string email)

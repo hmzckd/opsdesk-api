@@ -30,6 +30,12 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
 
         switch (exception)
         {
+            case ForbiddenException:
+                statusCode = StatusCodes.Status403Forbidden;
+                title = "Forbidden";
+                detail = exception.Message;
+                break;
+
             case ConflictException:
                 statusCode = StatusCodes.Status409Conflict;
                 title = "Conflict";

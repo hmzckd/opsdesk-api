@@ -13,6 +13,7 @@ OpsDesk API is a production-style .NET 10 backend for an internal support and op
 - Policy-based authorization and Ticket visibility
 - Ticket creation with server-owned status, requester, and timestamps
 - Ticket detail access for the requester, Agents, and Admins
+- Role-aware Ticket lifecycle transitions with persisted status history
 - Email, password, and Ticket input validation
 - Idempotent admin-user seeding from local secrets
 - Standardized Problem Details error responses
@@ -71,6 +72,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `GET` | `/me` | Authenticated | Read the current token identity |
 | `POST` | `/tickets` | Authenticated | Create a Ticket for the current user |
 | `GET` | `/tickets/{id}` | Authenticated and visible | Read one Ticket without leaking protected Tickets |
+| `PATCH` | `/tickets/{id}/status` | Authenticated and authorized | Change status and record the transition |
 | `GET` | `/admin/access` | Admin | Verify the `AdminOnly` policy |
 | `GET` | `/health` | Anonymous | Check API process health |
 | `GET` | `/swagger` | Anonymous | Open interactive API documentation |
@@ -183,6 +185,7 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - Named authorization policies keep role rules centralized and reusable.
 - Ticket visibility is decided in the Application layer and enforced by read-only database queries.
 - Customers receive `404 Not Found` for Tickets outside their visibility scope, preventing resource discovery.
+- Ticket status and its history record are saved atomically in one database transaction.
 - Global exception handling maps expected failures to consistent API responses.
 
 ## Roadmap
