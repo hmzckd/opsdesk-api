@@ -14,6 +14,22 @@ public sealed class TicketRepository : ITicketRepository
     }
 
     /// <summary>
+    /// Retrieves status history ordered by time and stable entry identity.
+    /// </summary>
+    public async Task<IReadOnlyList<TicketStatusChange>>
+        GetStatusHistoryAsync(
+            Guid ticketId,
+            CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.TicketStatusChanges
+            .AsNoTracking()
+            .Where(change => change.TicketId == ticketId)
+            .OrderBy(change => change.CreatedAtUtc)
+            .ThenBy(change => change.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Retrieves one Ticket as read-only data.
     /// </summary>
     public Task<Ticket?> GetByIdAsync(

@@ -112,6 +112,106 @@ public sealed class TicketStatusIntegrationTests
     }
 
     /// <summary>
+    /// Verifies a requester sees status history in chronological order.
+    /// </summary>
+    [Fact]
+    public async Task Requester_should_view_chronological_status_history()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse requester = await RegisterCustomerAsync(client);
+        SetBearerToken(client, requester.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+
+        AuthResponse agent = await CreateAgentAsync(client);
+        SetBearerToken(client, agent.AccessToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await ChangeStatusAsync(
+                client,
+                ticket.Id,
+                "in_progress")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await ChangeStatusAsync(
+                client,
+                ticket.Id,
+                "waiting_customer")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await ChangeStatusAsync(
+                client,
+                ticket.Id,
+                "in_progress")).StatusCode);
+
+        SetBearerToken(client, requester.AccessToken);
+        HttpResponseMessage response = await client.GetAsync(
+            $"/tickets/{ticket.Id}/status-history");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using JsonDocument document =
+            await JsonDocument.ParseAsync(
+                await response.Content.ReadAsStreamAsync());
+
+        JsonElement history = document.RootElement;
+
+        Assert.Equal(JsonValueKind.Array, history.ValueKind);
+        Assert.Equal(3, history.GetArrayLength());
+
+        AssertStatusHistoryItem(
+            history[0],
+            agent.UserId,
+            "open",
+            "in_progress");
+        AssertStatusHistoryItem(
+            history[1],
+            agent.UserId,
+            "in_progress",
+            "waiting_customer");
+        AssertStatusHistoryItem(
+            history[2],
+            agent.UserId,
+            "waiting_customer",
+            "in_progress");
+
+        DateTime firstChange = history[0]
+            .GetProperty("createdAtUtc")
+            .GetDateTime();
+        DateTime secondChange = history[1]
+            .GetProperty("createdAtUtc")
+            .GetDateTime();
+        DateTime thirdChange = history[2]
+            .GetProperty("createdAtUtc")
+            .GetDateTime();
+
+        Assert.True(firstChange <= secondChange);
+        Assert.True(secondChange <= thirdChange);
+    }
+
+    /// <summary>
+    /// Verifies a Customer cannot discover another Ticket's history.
+    /// </summary>
+    [Fact]
+    public async Task Customer_viewing_another_history_should_return_not_found()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse owner = await RegisterCustomerAsync(client);
+        SetBearerToken(client, owner.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+
+        AuthResponse otherCustomer = await RegisterCustomerAsync(client);
+        SetBearerToken(client, otherCustomer.AccessToken);
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/tickets/{ticket.Id}/status-history");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    /// <summary>
     /// Verifies an invalid transition returns Conflict without persistence.
     /// </summary>
     [Fact]
@@ -582,6 +682,32 @@ public sealed class TicketStatusIntegrationTests
     {
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", accessToken);
+    }
+
+    /// <summary>
+    /// Verifies one status-history item's public JSON contract.
+    /// </summary>
+    private static void AssertStatusHistoryItem(
+        JsonElement item,
+        Guid expectedActorId,
+        string expectedPreviousStatus,
+        string expectedNewStatus)
+    {
+        Assert.NotEqual(
+            Guid.Empty,
+            item.GetProperty("id").GetGuid());
+        Assert.Equal(
+            expectedActorId,
+            item.GetProperty("actorId").GetGuid());
+        Assert.Equal(
+            expectedPreviousStatus,
+            item.GetProperty("previousStatus").GetString());
+        Assert.Equal(
+            expectedNewStatus,
+            item.GetProperty("newStatus").GetString());
+        Assert.Equal(
+            DateTimeKind.Utc,
+            item.GetProperty("createdAtUtc").GetDateTime().Kind);
     }
 
     /// <summary>

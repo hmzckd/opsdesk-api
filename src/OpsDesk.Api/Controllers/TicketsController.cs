@@ -20,6 +20,46 @@ public sealed class TicketsController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves one visible Ticket's chronological status history.
+    /// </summary>
+    [HttpGet("{id:guid}/status-history")]
+    [ProducesResponseType<IReadOnlyList<TicketStatusChangeResponse>>(
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<
+        ActionResult<IReadOnlyList<TicketStatusChangeResponse>>>
+        GetStatusHistory(
+            Guid id,
+            CancellationToken cancellationToken)
+    {
+        string? userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        string? userRoleClaim =
+            User.FindFirstValue(ClaimTypes.Role);
+
+        if (!Guid.TryParse(userIdClaim, out Guid viewerId) ||
+            !Enum.TryParse(
+                userRoleClaim,
+                ignoreCase: true,
+                out UserRole viewerRole) ||
+            !Enum.IsDefined(viewerRole))
+        {
+            return Unauthorized();
+        }
+
+        IReadOnlyList<TicketStatusChangeResponse>? response =
+            await _ticketService.GetStatusHistoryAsync(
+                id,
+                viewerId,
+                viewerRole,
+                cancellationToken);
+
+        return response is null ? NotFound() : Ok(response);
+    }
+
+    /// <summary>
     /// Changes one Ticket's lifecycle status.
     /// </summary>
     [HttpPatch("{id:guid}/status")]

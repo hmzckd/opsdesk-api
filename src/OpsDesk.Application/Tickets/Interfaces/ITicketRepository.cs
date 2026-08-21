@@ -5,6 +5,13 @@ namespace OpsDesk.Application.Tickets.Interfaces;
 public interface ITicketRepository
 {
     /// <summary>
+    /// Retrieves status changes in a stable chronological order.
+    /// </summary>
+    Task<IReadOnlyList<TicketStatusChange>> GetStatusHistoryAsync(
+        Guid ticketId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves one Ticket without tracking it for changes.
     /// </summary>
     Task<Ticket?> GetByIdAsync(

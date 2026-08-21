@@ -6,6 +6,16 @@ namespace OpsDesk.Application.Tickets.Interfaces;
 public interface ITicketService
 {
     /// <summary>
+    /// Retrieves visible status history for an authenticated User.
+    /// </summary>
+    Task<IReadOnlyList<TicketStatusChangeResponse>?>
+        GetStatusHistoryAsync(
+            Guid ticketId,
+            Guid viewerId,
+            UserRole viewerRole,
+            CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Changes one Ticket's status for an authenticated actor.
     /// </summary>
     Task<TicketResponse?> ChangeStatusAsync(

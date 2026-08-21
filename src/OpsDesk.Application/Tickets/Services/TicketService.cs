@@ -16,6 +16,54 @@ public sealed class TicketService : ITicketService
     }
 
     /// <summary>
+    /// Authorizes a viewer and returns one Ticket's status history.
+    /// </summary>
+    public async Task<IReadOnlyList<TicketStatusChangeResponse>?>
+        GetStatusHistoryAsync(
+            Guid ticketId,
+            Guid viewerId,
+            UserRole viewerRole,
+            CancellationToken cancellationToken = default)
+    {
+        Ticket? visibleTicket;
+
+        switch (viewerRole)
+        {
+            case UserRole.Customer:
+                visibleTicket =
+                    await _ticketRepository.GetByIdForRequesterAsync(
+                        ticketId,
+                        viewerId,
+                        cancellationToken);
+                break;
+
+            case UserRole.Agent:
+            case UserRole.Admin:
+                visibleTicket = await _ticketRepository.GetByIdAsync(
+                    ticketId,
+                    cancellationToken);
+                break;
+
+            default:
+                return null;
+        }
+
+        if (visibleTicket is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<TicketStatusChange> history =
+            await _ticketRepository.GetStatusHistoryAsync(
+                ticketId,
+                cancellationToken);
+
+        return history
+            .Select(MapToStatusChangeResponse)
+            .ToArray();
+    }
+
+    /// <summary>
     /// Authorizes and persists one Ticket status transition.
     /// </summary>
     public async Task<TicketResponse?> ChangeStatusAsync(
@@ -174,5 +222,19 @@ public sealed class TicketService : ITicketService
             ticket.UpdatedAtUtc,
             ticket.ResolvedAtUtc,
             ticket.ClosedAtUtc);
+    }
+
+    /// <summary>
+    /// Converts a Domain status change into the public response contract.
+    /// </summary>
+    private static TicketStatusChangeResponse MapToStatusChangeResponse(
+        TicketStatusChange statusChange)
+    {
+        return new TicketStatusChangeResponse(
+            statusChange.Id,
+            statusChange.ActorId,
+            statusChange.PreviousStatus,
+            statusChange.NewStatus,
+            statusChange.CreatedAtUtc);
     }
 }
