@@ -483,5 +483,8 @@ $RECYCLE.BIN/
 
 # Local AI and workspace tooling
 .agents/
+.claude/
 .serena/
 /AGENTS.md
+/CLAUDE.md
+/skills-lock.json
