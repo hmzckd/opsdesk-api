@@ -14,6 +14,18 @@ public sealed class TicketRepository : ITicketRepository
     }
 
     /// <summary>
+    /// Adds one Ticket Comment to the EF Core change tracker.
+    /// </summary>
+    public async Task AddCommentAsync(
+        TicketComment comment,
+        CancellationToken cancellationToken = default)
+    {
+        await _dbContext.TicketComments.AddAsync(
+            comment,
+            cancellationToken);
+    }
+
+    /// <summary>
     /// Retrieves status history ordered by time and stable entry identity.
     /// </summary>
     public async Task<IReadOnlyList<TicketStatusChange>>

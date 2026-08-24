@@ -149,6 +149,31 @@ public sealed class Ticket
     }
 
     /// <summary>
+    /// Adds a public Comment when the Ticket still accepts activity.
+    /// </summary>
+    public TicketComment AddComment(
+        Guid authorId,
+        string? content,
+        DateTime createdAtUtc)
+    {
+        if (Status == TicketStatus.Closed)
+        {
+            throw new InvalidOperationException(
+                "Closed tickets cannot receive comments.");
+        }
+
+        TicketComment comment = TicketComment.Create(
+            Id,
+            authorId,
+            content,
+            createdAtUtc);
+
+        UpdatedAtUtc = createdAtUtc;
+
+        return comment;
+    }
+
+    /// <summary>
     /// Trims required text and enforces its maximum length.
     /// </summary>
     private static string NormalizeRequiredText(

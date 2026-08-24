@@ -16,6 +16,72 @@ public sealed class TicketService : ITicketService
     }
 
     /// <summary>
+    /// Authorizes, creates, and persists one public Ticket Comment.
+    /// </summary>
+    public async Task<TicketCommentResponse?> AddCommentAsync(
+        Guid ticketId,
+        Guid authorId,
+        UserRole authorRole,
+        AddTicketCommentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        Ticket? ticket;
+
+        switch (authorRole)
+        {
+            case UserRole.Customer:
+                ticket =
+                    await _ticketRepository
+                        .GetForUpdateForRequesterAsync(
+                            ticketId,
+                            authorId,
+                            cancellationToken);
+                break;
+
+            case UserRole.Agent:
+            case UserRole.Admin:
+                ticket = await _ticketRepository.GetForUpdateAsync(
+                    ticketId,
+                    cancellationToken);
+                break;
+
+            default:
+                return null;
+        }
+
+        if (ticket is null)
+        {
+            return null;
+        }
+
+        TicketComment comment;
+
+        try
+        {
+            comment = ticket.AddComment(
+                authorId,
+                request.Content,
+                DateTime.UtcNow);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new ConflictException(
+                exception.Message,
+                exception);
+        }
+
+        await _ticketRepository.AddCommentAsync(
+            comment,
+            cancellationToken);
+
+        await _ticketRepository.SaveChangesAsync(cancellationToken);
+
+        return MapToCommentResponse(comment);
+    }
+
+    /// <summary>
     /// Authorizes a viewer and returns one Ticket's status history.
     /// </summary>
     public async Task<IReadOnlyList<TicketStatusChangeResponse>?>
@@ -102,6 +168,17 @@ public sealed class TicketService : ITicketService
         if (ticket is null)
         {
             return null;
+        }
+
+        bool supportUserIsClosingTicket =
+            actorRole is UserRole.Agent or UserRole.Admin &&
+            request.Status == TicketStatus.Closed;
+
+        if (supportUserIsClosingTicket)
+        {
+            throw new ForbiddenException(
+                "Support users can resolve tickets, but only the " +
+                "requester can confirm closure.");
         }
 
         bool customerCanChangeStatus =
@@ -236,5 +313,19 @@ public sealed class TicketService : ITicketService
             statusChange.PreviousStatus,
             statusChange.NewStatus,
             statusChange.CreatedAtUtc);
+    }
+
+    /// <summary>
+    /// Converts a Domain Comment into the public response contract.
+    /// </summary>
+    private static TicketCommentResponse MapToCommentResponse(
+        TicketComment comment)
+    {
+        return new TicketCommentResponse(
+            comment.Id,
+            comment.TicketId,
+            comment.AuthorId,
+            comment.Content,
+            comment.CreatedAtUtc);
     }
 }

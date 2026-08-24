@@ -20,6 +20,54 @@ public sealed class TicketsController : ControllerBase
     }
 
     /// <summary>
+    /// Adds one public Comment to a visible Ticket.
+    /// </summary>
+    [HttpPost("{id:guid}/comments")]
+    [ProducesResponseType<TicketCommentResponse>(
+        StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TicketCommentResponse>> AddComment(
+        Guid id,
+        AddTicketCommentRequest request,
+        CancellationToken cancellationToken)
+    {
+        string? userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        string? userRoleClaim =
+            User.FindFirstValue(ClaimTypes.Role);
+
+        if (!Guid.TryParse(userIdClaim, out Guid authorId) ||
+            !Enum.TryParse(
+                userRoleClaim,
+                ignoreCase: true,
+                out UserRole authorRole) ||
+            !Enum.IsDefined(authorRole))
+        {
+            return Unauthorized();
+        }
+
+        TicketCommentResponse? response =
+            await _ticketService.AddCommentAsync(
+                id,
+                authorId,
+                authorRole,
+                request,
+                cancellationToken);
+
+        return response is null
+            ? NotFound()
+            : Created(
+                $"/tickets/{id}/comments/{response.Id}",
+                response);
+    }
+
+    /// <summary>
     /// Retrieves one visible Ticket's chronological status history.
     /// </summary>
     [HttpGet("{id:guid}/status-history")]

@@ -345,6 +345,61 @@ public sealed class TicketStatusIntegrationTests
     }
 
     /// <summary>
+    /// Verifies support roles can resolve a Ticket but cannot confirm closure.
+    /// </summary>
+    [Theory]
+    [InlineData(UserRole.Agent)]
+    [InlineData(UserRole.Admin)]
+    public async Task Support_user_closing_resolved_ticket_should_be_forbidden(
+        UserRole supportRole)
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse requester = await RegisterCustomerAsync(client);
+        SetBearerToken(client, requester.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+
+        AuthResponse supportUser =
+            await CreateStaffUserAsync(client, supportRole);
+        SetBearerToken(client, supportUser.AccessToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await ChangeStatusAsync(
+                client,
+                ticket.Id,
+                "in_progress")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await ChangeStatusAsync(
+                client,
+                ticket.Id,
+                "resolved")).StatusCode);
+
+        HttpResponseMessage response =
+            await ChangeStatusAsync(client, ticket.Id, "closed");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        await using AsyncServiceScope scope =
+            _factory.Services.CreateAsyncScope();
+        OpsDeskDbContext dbContext =
+            scope.ServiceProvider.GetRequiredService<OpsDeskDbContext>();
+
+        Ticket persistedTicket = await dbContext.Tickets
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == ticket.Id);
+        int eventCount = await dbContext.TicketStatusChanges
+            .AsNoTracking()
+            .CountAsync(item => item.TicketId == ticket.Id);
+
+        Assert.Equal(TicketStatus.Resolved, persistedTicket.Status);
+        Assert.NotNull(persistedTicket.ResolvedAtUtc);
+        Assert.Null(persistedTicket.ClosedAtUtc);
+        Assert.Equal(2, eventCount);
+    }
+
+    /// <summary>
     /// Verifies Customers cannot discover another requester's Ticket.
     /// </summary>
     [Fact]
@@ -456,10 +511,10 @@ public sealed class TicketStatusIntegrationTests
     }
 
     /// <summary>
-    /// Verifies an Agent can follow the complete operational lifecycle.
+    /// Verifies an Agent can follow the operational lifecycle to resolution.
     /// </summary>
     [Fact]
-    public async Task Agent_should_follow_complete_ticket_lifecycle()
+    public async Task Agent_should_follow_operational_lifecycle_to_resolved()
     {
         using HttpClient client = _factory.CreateClient();
 
@@ -475,8 +530,7 @@ public sealed class TicketStatusIntegrationTests
             "in_progress",
             "waiting_customer",
             "in_progress",
-            "resolved",
-            "closed"
+            "resolved"
         ];
 
         foreach (string status in statuses)
@@ -499,9 +553,9 @@ public sealed class TicketStatusIntegrationTests
             .AsNoTracking()
             .CountAsync(item => item.TicketId == ticket.Id);
 
-        Assert.Equal(TicketStatus.Closed, persistedTicket.Status);
+        Assert.Equal(TicketStatus.Resolved, persistedTicket.Status);
         Assert.NotNull(persistedTicket.ResolvedAtUtc);
-        Assert.NotNull(persistedTicket.ClosedAtUtc);
+        Assert.Null(persistedTicket.ClosedAtUtc);
         Assert.Equal(statuses.Length, eventCount);
     }
 

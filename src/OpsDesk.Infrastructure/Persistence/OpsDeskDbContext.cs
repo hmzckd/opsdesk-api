@@ -15,6 +15,8 @@ public sealed class OpsDeskDbContext : DbContext
 
     public DbSet<Ticket> Tickets => Set<Ticket>();
 
+    public DbSet<TicketComment> TicketComments => Set<TicketComment>();
+
     public DbSet<TicketStatusChange> TicketStatusChanges =>
         Set<TicketStatusChange>();
 

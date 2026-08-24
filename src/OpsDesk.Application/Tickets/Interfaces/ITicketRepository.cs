@@ -5,6 +5,13 @@ namespace OpsDesk.Application.Tickets.Interfaces;
 public interface ITicketRepository
 {
     /// <summary>
+    /// Adds one Ticket Comment to the current transaction.
+    /// </summary>
+    Task AddCommentAsync(
+        TicketComment comment,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves status changes in a stable chronological order.
     /// </summary>
     Task<IReadOnlyList<TicketStatusChange>> GetStatusHistoryAsync(

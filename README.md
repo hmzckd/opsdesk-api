@@ -16,6 +16,8 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 - Ticket creation with server-owned status, requester, and timestamps
 - Ticket detail access for the requester, Agents, and Admins
 - Role-aware Ticket lifecycle transitions with persisted status history
+- Public Ticket comments with role-aware visibility
+- Requester-confirmed closure after support resolution
 - Email, password, and Ticket input validation
 - Idempotent admin-user seeding from local secrets
 - Standardized Problem Details error responses
@@ -76,6 +78,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `GET` | `/tickets/{id}` | Authenticated and visible | Read one Ticket without leaking protected Tickets |
 | `PATCH` | `/tickets/{id}/status` | Authenticated and authorized | Change status and record the transition |
 | `GET` | `/tickets/{id}/status-history` | Authenticated and visible | Read chronological status history with actor IDs |
+| `POST` | `/tickets/{id}/comments` | Authenticated and visible | Add a public comment with server-owned author and time |
 | `GET` | `/admin/access` | Admin | Verify the `AdminOnly` policy |
 | `GET` | `/health` | Anonymous | Check API process health |
 | `GET` | `/swagger` | Anonymous | Open interactive API documentation |
@@ -86,6 +89,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 - `description` is required and accepts at most 5,000 characters.
 - `priority` is optional and defaults to `medium`.
 - Priority values are `low`, `medium`, `high`, and `urgent`.
+- Comment content is required and accepts at most 4,000 characters.
 - OpenAPI publishes required fields, string limits, and enum values for API clients and frontend controls.
 
 ## Run Locally
@@ -197,6 +201,8 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - Ticket visibility is decided in the Application layer and enforced by read-only database queries.
 - Customers receive `404 Not Found` for Tickets outside their visibility scope, preventing resource discovery.
 - Ticket status and its history record are saved atomically in one database transaction.
+- Agents and Admins resolve Tickets; only the requester confirms final closure.
+- Comment author identity and creation time come from the authenticated server request, not client input.
 - Global exception handling maps expected failures to consistent API responses.
 
 ## Roadmap

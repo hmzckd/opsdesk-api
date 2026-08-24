@@ -45,10 +45,18 @@ An Agent is actively working on the Ticket.
 Work cannot continue until the requester provides information or responds.
 
 **Resolved**:
-A solution has been provided, but the Ticket has not yet reached its final state.
+A solution has been provided and is waiting for requester confirmation.
 
 **Closed**:
-The Ticket is complete and no longer requires active handling.
+The requester has accepted the resolution. The Ticket is final and no longer accepts active handling.
+
+**Reopen**:
+The requester rejects a proposed resolution and returns the Ticket to In Progress.
+_Avoid_: Appeal, dispute
+
+**Ticket Comment**:
+A public message added to a Ticket conversation by an authenticated User. A Ticket Comment keeps its author and creation time permanently.
+_Avoid_: Internal note, audit entry
 
 **Ticket Priority**:
 The operational urgency assigned to a Ticket. V2 supports Low, Medium, High, and Urgent priority.
