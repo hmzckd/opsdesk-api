@@ -4,6 +4,8 @@
 
 OpsDesk API is a production-style .NET 10 backend for an internal support and operations desk. Users can authenticate, create support Tickets, and retrieve Ticket details according to role-based visibility rules.
 
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
 ## Capabilities
 
 - Customer registration and login
@@ -73,9 +75,18 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `POST` | `/tickets` | Authenticated | Create a Ticket for the current user |
 | `GET` | `/tickets/{id}` | Authenticated and visible | Read one Ticket without leaking protected Tickets |
 | `PATCH` | `/tickets/{id}/status` | Authenticated and authorized | Change status and record the transition |
+| `GET` | `/tickets/{id}/status-history` | Authenticated and visible | Read chronological status history with actor IDs |
 | `GET` | `/admin/access` | Admin | Verify the `AdminOnly` policy |
 | `GET` | `/health` | Anonymous | Check API process health |
 | `GET` | `/swagger` | Anonymous | Open interactive API documentation |
+
+## Ticket Input Contract
+
+- `title` is required and accepts at most 200 characters.
+- `description` is required and accepts at most 5,000 characters.
+- `priority` is optional and defaults to `medium`.
+- Priority values are `low`, `medium`, `high`, and `urgent`.
+- OpenAPI publishes required fields, string limits, and enum values for API clients and frontend controls.
 
 ## Run Locally
 
@@ -190,7 +201,9 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 
 ## Roadmap
 
-- `V2`: Ticket lifecycle, comments, assignment, filtering, and pagination
+- `V2.0`: Ticket creation, visibility, lifecycle, and status history
+- `V2.1`: Ticket comments, assignment, and activity timeline
+- `V2.2`: Ticket filtering, sorting, and pagination
 - `V3`: SLA policies, audit logs, approvals, and background jobs
 - `V4`: Human-approved .NET AI triage and summarization
 - `V5`: Optional Python worker for embeddings, similarity search, and reranking

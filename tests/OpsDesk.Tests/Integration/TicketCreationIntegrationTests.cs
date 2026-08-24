@@ -136,6 +136,98 @@ public sealed class TicketCreationIntegrationTests
     }
 
     /// <summary>
+    /// Verifies OpenAPI publishes Ticket text requirements for clients.
+    /// </summary>
+    [Fact]
+    public async Task OpenApi_should_publish_ticket_content_limits()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        HttpResponseMessage response = await client.GetAsync(
+            "/swagger/v1/swagger.json");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using JsonDocument document =
+            await JsonDocument.ParseAsync(
+                await response.Content.ReadAsStreamAsync());
+
+        JsonElement requestSchema = document.RootElement
+            .GetProperty("components")
+            .GetProperty("schemas")
+            .GetProperty(nameof(CreateTicketRequest));
+
+        JsonElement properties =
+            requestSchema.GetProperty("properties");
+
+        Assert.Equal(
+            Ticket.MaximumTitleLength,
+            properties
+                .GetProperty("title")
+                .GetProperty("maxLength")
+                .GetInt32());
+
+        Assert.Equal(
+            Ticket.MaximumDescriptionLength,
+            properties
+                .GetProperty("description")
+                .GetProperty("maxLength")
+                .GetInt32());
+
+        string[] requiredProperties = requestSchema
+            .GetProperty("required")
+            .EnumerateArray()
+            .Select(item => item.GetString() ?? string.Empty)
+            .ToArray();
+
+        Assert.Contains("title", requiredProperties);
+        Assert.Contains("description", requiredProperties);
+    }
+
+    /// <summary>
+    /// Verifies content exactly at both maximum lengths is accepted.
+    /// </summary>
+    [Fact]
+    public async Task Maximum_length_ticket_content_should_be_accepted()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse customer = await RegisterAsync(client);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                customer.AccessToken);
+
+        string title = new('T', Ticket.MaximumTitleLength);
+        string description =
+            new('D', Ticket.MaximumDescriptionLength);
+
+        HttpResponseMessage response =
+            await client.PostAsJsonAsync(
+                "/tickets",
+                new CreateTicketRequest(
+                    title,
+                    description));
+
+        string responseBody =
+            await response.Content.ReadAsStringAsync();
+
+        Assert.True(
+            response.StatusCode == HttpStatusCode.Created,
+            $"Expected Created but received {response.StatusCode}. " +
+            $"Response: {responseBody}");
+
+        TicketResponse? ticket =
+            await response.Content
+                .ReadFromJsonAsync<TicketResponse>(JsonOptions);
+
+        Assert.NotNull(ticket);
+        Assert.Equal(title, ticket.Title);
+        Assert.Equal(description, ticket.Description);
+    }
+
+    /// <summary>
     /// Verifies invalid required content is rejected by the public API.
     /// </summary>
     [Theory]
