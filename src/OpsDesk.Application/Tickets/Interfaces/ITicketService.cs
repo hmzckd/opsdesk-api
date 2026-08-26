@@ -6,6 +6,15 @@ namespace OpsDesk.Application.Tickets.Interfaces;
 public interface ITicketService
 {
     /// <summary>
+    /// Retrieves public Comments for a visible Ticket.
+    /// </summary>
+    Task<IReadOnlyList<TicketCommentResponse>?> GetCommentsAsync(
+        Guid ticketId,
+        Guid viewerId,
+        UserRole viewerRole,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds a public Comment to a visible Ticket.
     /// </summary>
     Task<TicketCommentResponse?> AddCommentAsync(

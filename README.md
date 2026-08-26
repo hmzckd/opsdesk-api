@@ -79,6 +79,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `PATCH` | `/tickets/{id}/status` | Authenticated and authorized | Change status and record the transition |
 | `GET` | `/tickets/{id}/status-history` | Authenticated and visible | Read chronological status history with actor IDs |
 | `POST` | `/tickets/{id}/comments` | Authenticated and visible | Add a public comment with server-owned author and time |
+| `GET` | `/tickets/{id}/comments` | Authenticated and visible | Read public comments from oldest to newest |
 | `GET` | `/admin/access` | Admin | Verify the `AdminOnly` policy |
 | `GET` | `/health` | Anonymous | Check API process health |
 | `GET` | `/swagger` | Anonymous | Open interactive API documentation |
@@ -203,6 +204,7 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - Ticket status and its history record are saved atomically in one database transaction.
 - Agents and Admins resolve Tickets; only the requester confirms final closure.
 - Comment author identity and creation time come from the authenticated server request, not client input.
+- Comment reads use creation time and Comment ID for deterministic chronological ordering.
 - Global exception handling maps expected failures to consistent API responses.
 
 ## Roadmap

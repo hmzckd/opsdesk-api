@@ -20,6 +20,46 @@ public sealed class TicketsController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves one visible Ticket's public Comments chronologically.
+    /// </summary>
+    [HttpGet("{id:guid}/comments")]
+    [ProducesResponseType<IReadOnlyList<TicketCommentResponse>>(
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<
+        ActionResult<IReadOnlyList<TicketCommentResponse>>>
+        GetComments(
+            Guid id,
+            CancellationToken cancellationToken)
+    {
+        string? userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        string? userRoleClaim =
+            User.FindFirstValue(ClaimTypes.Role);
+
+        if (!Guid.TryParse(userIdClaim, out Guid viewerId) ||
+            !Enum.TryParse(
+                userRoleClaim,
+                ignoreCase: true,
+                out UserRole viewerRole) ||
+            !Enum.IsDefined(viewerRole))
+        {
+            return Unauthorized();
+        }
+
+        IReadOnlyList<TicketCommentResponse>? response =
+            await _ticketService.GetCommentsAsync(
+                id,
+                viewerId,
+                viewerRole,
+                cancellationToken);
+
+        return response is null ? NotFound() : Ok(response);
+    }
+
+    /// <summary>
     /// Adds one public Comment to a visible Ticket.
     /// </summary>
     [HttpPost("{id:guid}/comments")]

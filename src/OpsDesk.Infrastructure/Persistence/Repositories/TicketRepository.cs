@@ -14,6 +14,21 @@ public sealed class TicketRepository : ITicketRepository
     }
 
     /// <summary>
+    /// Retrieves Comments ordered by time and stable Comment identity.
+    /// </summary>
+    public async Task<IReadOnlyList<TicketComment>> GetCommentsAsync(
+        Guid ticketId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.TicketComments
+            .AsNoTracking()
+            .Where(comment => comment.TicketId == ticketId)
+            .OrderBy(comment => comment.CreatedAtUtc)
+            .ThenBy(comment => comment.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Adds one Ticket Comment to the EF Core change tracker.
     /// </summary>
     public async Task AddCommentAsync(

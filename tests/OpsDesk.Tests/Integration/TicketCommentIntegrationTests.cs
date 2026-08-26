@@ -93,6 +93,288 @@ public sealed class TicketCommentIntegrationTests
     }
 
     /// <summary>
+    /// Verifies the requester sees public Comments from oldest to newest.
+    /// </summary>
+    [Fact]
+    public async Task Requester_should_view_comments_in_chronological_order()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse requester = await RegisterCustomerAsync(client);
+        SetBearerToken(client, requester.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await client.PostAsJsonAsync(
+                $"/tickets/{ticket.Id}/comments",
+                new { content = "First public comment." })).StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await client.PostAsJsonAsync(
+                $"/tickets/{ticket.Id}/comments",
+                new { content = "Second public comment." })).StatusCode);
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/tickets/{ticket.Id}/comments");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        TicketCommentResponse[]? comments =
+            await response.Content
+                .ReadFromJsonAsync<TicketCommentResponse[]>();
+
+        Assert.NotNull(comments);
+        Assert.Equal(2, comments.Length);
+        Assert.Equal(
+            new[]
+            {
+                "First public comment.",
+                "Second public comment."
+            },
+            comments.Select(comment => comment.Content));
+        Assert.All(
+            comments,
+            comment =>
+            {
+                Assert.Equal(ticket.Id, comment.TicketId);
+                Assert.Equal(requester.UserId, comment.AuthorId);
+                Assert.Equal(DateTimeKind.Utc, comment.CreatedAtUtc.Kind);
+            });
+        Assert.True(
+            comments[0].CreatedAtUtc <= comments[1].CreatedAtUtc);
+    }
+
+    /// <summary>
+    /// Verifies support roles can read a visible Ticket conversation.
+    /// </summary>
+    [Theory]
+    [InlineData(UserRole.Agent)]
+    [InlineData(UserRole.Admin)]
+    public async Task Support_user_should_view_ticket_comments(
+        UserRole supportRole)
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse requester = await RegisterCustomerAsync(client);
+        SetBearerToken(client, requester.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await client.PostAsJsonAsync(
+                $"/tickets/{ticket.Id}/comments",
+                new { content = "Visible public comment." })).StatusCode);
+
+        AuthResponse supportUser =
+            await CreateStaffUserAsync(client, supportRole);
+        SetBearerToken(client, supportUser.AccessToken);
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/tickets/{ticket.Id}/comments");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        TicketCommentResponse[]? comments =
+            await response.Content
+                .ReadFromJsonAsync<TicketCommentResponse[]>();
+
+        TicketCommentResponse comment = Assert.Single(
+            Assert.IsType<TicketCommentResponse[]>(comments));
+
+        Assert.Equal(requester.UserId, comment.AuthorId);
+        Assert.Equal("Visible public comment.", comment.Content);
+    }
+
+    /// <summary>
+    /// Verifies a visible Ticket without Comments returns an empty array.
+    /// </summary>
+    [Fact]
+    public async Task Visible_ticket_without_comments_should_return_empty_array()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse requester = await RegisterCustomerAsync(client);
+        SetBearerToken(client, requester.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/tickets/{ticket.Id}/comments");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        TicketCommentResponse[]? comments =
+            await response.Content
+                .ReadFromJsonAsync<TicketCommentResponse[]>();
+
+        Assert.Empty(
+            Assert.IsType<TicketCommentResponse[]>(comments));
+    }
+
+    /// <summary>
+    /// Verifies a Customer cannot discover another Ticket's conversation.
+    /// </summary>
+    [Fact]
+    public async Task Customer_viewing_another_conversation_should_return_not_found()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse owner = await RegisterCustomerAsync(client);
+        SetBearerToken(client, owner.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await client.PostAsJsonAsync(
+                $"/tickets/{ticket.Id}/comments",
+                new { content = "Private by Ticket visibility." }))
+            .StatusCode);
+
+        AuthResponse otherCustomer = await RegisterCustomerAsync(client);
+        SetBearerToken(client, otherCustomer.AccessToken);
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/tickets/{ticket.Id}/comments");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    /// <summary>
+    /// Verifies reading a Ticket conversation requires authentication.
+    /// </summary>
+    [Fact]
+    public async Task Anonymous_user_should_not_view_comments()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/tickets/{Guid.NewGuid()}/comments");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    /// <summary>
+    /// Verifies a Closed Ticket keeps its public conversation readable.
+    /// </summary>
+    [Fact]
+    public async Task Requester_should_view_comments_after_ticket_is_closed()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse requester = await RegisterCustomerAsync(client);
+        SetBearerToken(client, requester.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            (await client.PostAsJsonAsync(
+                $"/tickets/{ticket.Id}/comments",
+                new { content = "Conversation remains readable." }))
+            .StatusCode);
+
+        AuthResponse agent =
+            await CreateStaffUserAsync(client, UserRole.Agent);
+        SetBearerToken(client, agent.AccessToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await ChangeStatusAsync(
+                client,
+                ticket.Id,
+                "in_progress")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await ChangeStatusAsync(
+                client,
+                ticket.Id,
+                "resolved")).StatusCode);
+
+        SetBearerToken(client, requester.AccessToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await ChangeStatusAsync(
+                client,
+                ticket.Id,
+                "closed")).StatusCode);
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/tickets/{ticket.Id}/comments");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        TicketCommentResponse[]? comments =
+            await response.Content
+                .ReadFromJsonAsync<TicketCommentResponse[]>();
+
+        TicketCommentResponse comment = Assert.Single(
+            Assert.IsType<TicketCommentResponse[]>(comments));
+
+        Assert.Equal("Conversation remains readable.", comment.Content);
+    }
+
+    /// <summary>
+    /// Verifies equal-time Comments use their identity as a stable tie-breaker.
+    /// </summary>
+    [Fact]
+    public async Task Equal_time_comments_should_be_ordered_by_id()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse requester = await RegisterCustomerAsync(client);
+        SetBearerToken(client, requester.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+
+        DateTime sharedCreatedAtUtc = DateTime.UtcNow;
+        TicketComment first = TicketComment.Create(
+            ticket.Id,
+            requester.UserId,
+            "First identity candidate.",
+            sharedCreatedAtUtc);
+        TicketComment second = TicketComment.Create(
+            ticket.Id,
+            requester.UserId,
+            "Second identity candidate.",
+            sharedCreatedAtUtc);
+
+        TicketComment[] descendingComments =
+            new[] { first, second }
+                .OrderByDescending(comment => comment.Id)
+                .ToArray();
+
+        await using (AsyncServiceScope scope =
+            _factory.Services.CreateAsyncScope())
+        {
+            OpsDeskDbContext dbContext =
+                scope.ServiceProvider
+                    .GetRequiredService<OpsDeskDbContext>();
+
+            dbContext.TicketComments.AddRange(descendingComments);
+            await dbContext.SaveChangesAsync();
+        }
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/tickets/{ticket.Id}/comments");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        TicketCommentResponse[]? comments =
+            await response.Content
+                .ReadFromJsonAsync<TicketCommentResponse[]>();
+
+        Guid[] expectedOrder = descendingComments
+            .Select(comment => comment.Id)
+            .Order()
+            .ToArray();
+
+        Assert.Equal(
+            expectedOrder,
+            Assert.IsType<TicketCommentResponse[]>(comments)
+                .Select(comment => comment.Id));
+    }
+
+    /// <summary>
     /// Verifies invalid Comment content creates no database record.
     /// </summary>
     [Theory]

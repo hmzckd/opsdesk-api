@@ -16,6 +16,37 @@ public sealed class TicketService : ITicketService
     }
 
     /// <summary>
+    /// Authorizes a viewer and returns one Ticket's public Comments.
+    /// </summary>
+    public async Task<IReadOnlyList<TicketCommentResponse>?>
+        GetCommentsAsync(
+            Guid ticketId,
+            Guid viewerId,
+            UserRole viewerRole,
+            CancellationToken cancellationToken = default)
+    {
+        Ticket? visibleTicket = await GetVisibleTicketAsync(
+            ticketId,
+            viewerId,
+            viewerRole,
+            cancellationToken);
+
+        if (visibleTicket is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<TicketComment> comments =
+            await _ticketRepository.GetCommentsAsync(
+                ticketId,
+                cancellationToken);
+
+        return comments
+            .Select(MapToCommentResponse)
+            .ToArray();
+    }
+
+    /// <summary>
     /// Authorizes, creates, and persists one public Ticket Comment.
     /// </summary>
     public async Task<TicketCommentResponse?> AddCommentAsync(
@@ -91,28 +122,11 @@ public sealed class TicketService : ITicketService
             UserRole viewerRole,
             CancellationToken cancellationToken = default)
     {
-        Ticket? visibleTicket;
-
-        switch (viewerRole)
-        {
-            case UserRole.Customer:
-                visibleTicket =
-                    await _ticketRepository.GetByIdForRequesterAsync(
-                        ticketId,
-                        viewerId,
-                        cancellationToken);
-                break;
-
-            case UserRole.Agent:
-            case UserRole.Admin:
-                visibleTicket = await _ticketRepository.GetByIdAsync(
-                    ticketId,
-                    cancellationToken);
-                break;
-
-            default:
-                return null;
-        }
+        Ticket? visibleTicket = await GetVisibleTicketAsync(
+            ticketId,
+            viewerId,
+            viewerRole,
+            cancellationToken);
 
         if (visibleTicket is null)
         {
@@ -233,28 +247,11 @@ public sealed class TicketService : ITicketService
         UserRole viewerRole,
         CancellationToken cancellationToken = default)
     {
-        Ticket? ticket;
-
-        switch (viewerRole)
-        {
-            case UserRole.Customer:
-                ticket =
-                    await _ticketRepository.GetByIdForRequesterAsync(
-                        ticketId,
-                        viewerId,
-                        cancellationToken);
-                break;
-
-            case UserRole.Agent:
-            case UserRole.Admin:
-                ticket = await _ticketRepository.GetByIdAsync(
-                    ticketId,
-                    cancellationToken);
-                break;
-
-            default:
-                return null;
-        }
+        Ticket? ticket = await GetVisibleTicketAsync(
+            ticketId,
+            viewerId,
+            viewerRole,
+            cancellationToken);
 
         return ticket is null ? null : MapToResponse(ticket);
     }
@@ -280,6 +277,30 @@ public sealed class TicketService : ITicketService
             cancellationToken);
 
         return MapToResponse(ticket);
+    }
+
+    /// <summary>
+    /// Selects the read-only Ticket query for an authenticated viewer.
+    /// </summary>
+    private Task<Ticket?> GetVisibleTicketAsync(
+        Guid ticketId,
+        Guid viewerId,
+        UserRole viewerRole,
+        CancellationToken cancellationToken)
+    {
+        return viewerRole switch
+        {
+            UserRole.Customer =>
+                _ticketRepository.GetByIdForRequesterAsync(
+                    ticketId,
+                    viewerId,
+                    cancellationToken),
+            UserRole.Agent or UserRole.Admin =>
+                _ticketRepository.GetByIdAsync(
+                    ticketId,
+                    cancellationToken),
+            _ => Task.FromResult<Ticket?>(null)
+        };
     }
 
     /// <summary>
