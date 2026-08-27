@@ -14,7 +14,9 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 - `Admin`, `Agent`, and `Customer` roles
 - Policy-based authorization and Ticket visibility
 - Ticket creation with server-owned status, requester, and timestamps
-- Ticket detail access for the requester, Agents, and Admins
+- Ticket detail access for the requester, eligible Agents, and Admins
+- Agent self-assignment and Admin assignment management
+- Assignment activity with optimistic concurrency protection
 - Role-aware Ticket lifecycle transitions with persisted status history
 - Public Ticket comments with role-aware visibility
 - Requester-confirmed closure after support resolution
@@ -76,6 +78,8 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `GET` | `/me` | Authenticated | Read the current token identity |
 | `POST` | `/tickets` | Authenticated | Create a Ticket for the current user |
 | `GET` | `/tickets/{id}` | Authenticated and visible | Read one Ticket without leaking protected Tickets |
+| `PUT` | `/tickets/{id}/assignee` | Agent or Admin | Assign a Ticket to an Agent; Agents can only select themselves |
+| `DELETE` | `/tickets/{id}/assignee` | Agent or Admin | Remove the current assignee within the caller's ownership scope |
 | `PATCH` | `/tickets/{id}/status` | Authenticated and authorized | Change status and record the transition |
 | `GET` | `/tickets/{id}/status-history` | Authenticated and visible | Read chronological status history with actor IDs |
 | `POST` | `/tickets/{id}/comments` | Authenticated and visible | Add a public comment with server-owned author and time |
@@ -200,7 +204,12 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - Admin seeding creates missing data but never silently promotes an existing user.
 - Named authorization policies keep role rules centralized and reusable.
 - Ticket visibility is decided in the Application layer and enforced by read-only database queries.
-- Customers receive `404 Not Found` for Tickets outside their visibility scope, preventing resource discovery.
+- Customers and Agents receive `404 Not Found` for Tickets outside their visibility scope, preventing resource discovery.
+- Agents can read unassigned or self-assigned Tickets, but can mutate only self-assigned Tickets; Admins can access every Ticket.
+- Agents can claim only unassigned Tickets or repeat their own assignment; they cannot take a Ticket assigned to another Agent.
+- Assignment endpoints are idempotent: repeating the same assignment or unassignment does not create activity or alter timestamps.
+- Ticket concurrency tokens prevent simultaneous claims from overwriting each other; one request wins and the loser receives `409 Conflict`.
+- Every real assignment change stores the actor, previous assignee, new assignee, and server-owned UTC time.
 - Ticket status and its history record are saved atomically in one database transaction.
 - Agents and Admins resolve Tickets; only the requester confirms final closure.
 - Comment author identity and creation time come from the authenticated server request, not client input.

@@ -6,6 +6,25 @@ namespace OpsDesk.Application.Tickets.Interfaces;
 public interface ITicketService
 {
     /// <summary>
+    /// Assigns a visible Ticket to an Agent.
+    /// </summary>
+    Task<TicketResponse?> AssignAsync(
+        Guid ticketId,
+        Guid assigneeId,
+        Guid actorId,
+        UserRole actorRole,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes the assignee from a visible Ticket.
+    /// </summary>
+    Task<TicketResponse?> UnassignAsync(
+        Guid ticketId,
+        Guid actorId,
+        UserRole actorRole,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves public Comments for a visible Ticket.
     /// </summary>
     Task<IReadOnlyList<TicketCommentResponse>?> GetCommentsAsync(

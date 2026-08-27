@@ -20,6 +20,9 @@ public sealed class OpsDeskDbContext : DbContext
     public DbSet<TicketStatusChange> TicketStatusChanges =>
         Set<TicketStatusChange>();
 
+    public DbSet<TicketAssignmentChange> TicketAssignmentChanges =>
+        Set<TicketAssignmentChange>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

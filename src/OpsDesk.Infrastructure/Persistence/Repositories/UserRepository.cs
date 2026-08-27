@@ -37,6 +37,20 @@ public sealed class UserRepository : IUserRepository
                 cancellationToken);
     }
 
+    /// <summary>
+    /// Retrieves one User as read-only data for identity and role checks.
+    /// </summary>
+    public Task<User?> GetByIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Users
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                user => user.Id == userId,
+                cancellationToken);
+    }
+
     public async Task AddAsync(
         User user,
         CancellationToken cancellationToken = default)

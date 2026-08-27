@@ -31,6 +31,7 @@ public sealed class TicketTests
         Assert.Equal(DateTimeKind.Utc, ticket.CreatedAtUtc.Kind);
         Assert.Null(ticket.ResolvedAtUtc);
         Assert.Null(ticket.ClosedAtUtc);
+        Assert.NotEqual(Guid.Empty, ticket.ConcurrencyToken);
     }
 
     /// <summary>
@@ -48,6 +49,200 @@ public sealed class TicketTests
     }
 
     /// <summary>
+    /// Verifies assigning an unassigned Ticket changes ownership once.
+    /// </summary>
+    [Fact]
+    public void Assign_should_set_assignee_and_update_ticket_version()
+    {
+        Ticket ticket = Ticket.Create(
+            Guid.NewGuid(),
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        Guid originalConcurrencyToken = ticket.ConcurrencyToken;
+        Guid assigneeId = Guid.NewGuid();
+        DateTime assignedAtUtc = ticket.UpdatedAtUtc.AddMinutes(1);
+
+        bool changed = ticket.Assign(assigneeId, assignedAtUtc);
+
+        Assert.True(changed);
+        Assert.Equal(assigneeId, ticket.AssigneeId);
+        Assert.Equal(assignedAtUtc, ticket.UpdatedAtUtc);
+        Assert.NotEqual(
+            originalConcurrencyToken,
+            ticket.ConcurrencyToken);
+    }
+
+    /// <summary>
+    /// Verifies an empty User identity cannot become the assignee.
+    /// </summary>
+    [Fact]
+    public void Assign_should_reject_empty_assignee_id()
+    {
+        Ticket ticket = Ticket.Create(
+            Guid.NewGuid(),
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        Assert.Throws<ArgumentException>(() =>
+            ticket.Assign(Guid.Empty, DateTime.UtcNow));
+
+        Assert.Null(ticket.AssigneeId);
+    }
+
+    /// <summary>
+    /// Verifies repeating the same assignment is a true no-op.
+    /// </summary>
+    [Fact]
+    public void Assign_should_not_change_ticket_for_same_assignee()
+    {
+        Ticket ticket = Ticket.Create(
+            Guid.NewGuid(),
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        Guid assigneeId = Guid.NewGuid();
+        DateTime assignedAtUtc = ticket.UpdatedAtUtc.AddMinutes(1);
+
+        Assert.True(ticket.Assign(assigneeId, assignedAtUtc));
+
+        Guid assignedConcurrencyToken = ticket.ConcurrencyToken;
+
+        bool changed = ticket.Assign(
+            assigneeId,
+            assignedAtUtc.AddMinutes(1));
+
+        Assert.False(changed);
+        Assert.Equal(assigneeId, ticket.AssigneeId);
+        Assert.Equal(assignedAtUtc, ticket.UpdatedAtUtc);
+        Assert.Equal(
+            assignedConcurrencyToken,
+            ticket.ConcurrencyToken);
+    }
+
+    /// <summary>
+    /// Verifies unassignment clears ownership and reports a real change.
+    /// </summary>
+    [Fact]
+    public void Unassign_should_clear_assignee_and_update_ticket_version()
+    {
+        Ticket ticket = Ticket.Create(
+            Guid.NewGuid(),
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        Assert.True(
+            ticket.Assign(
+                Guid.NewGuid(),
+                ticket.UpdatedAtUtc.AddMinutes(1)));
+
+        Guid assignedConcurrencyToken = ticket.ConcurrencyToken;
+        DateTime unassignedAtUtc =
+            ticket.UpdatedAtUtc.AddMinutes(1);
+
+        bool changed = ticket.Unassign(unassignedAtUtc);
+
+        Assert.True(changed);
+        Assert.Null(ticket.AssigneeId);
+        Assert.Equal(unassignedAtUtc, ticket.UpdatedAtUtc);
+        Assert.NotEqual(
+            assignedConcurrencyToken,
+            ticket.ConcurrencyToken);
+    }
+
+    /// <summary>
+    /// Verifies removing an already empty assignment is a true no-op.
+    /// </summary>
+    [Fact]
+    public void Unassign_should_not_change_unassigned_ticket()
+    {
+        Ticket ticket = Ticket.Create(
+            Guid.NewGuid(),
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        DateTime originalUpdatedAtUtc = ticket.UpdatedAtUtc;
+        Guid originalConcurrencyToken = ticket.ConcurrencyToken;
+
+        bool changed = ticket.Unassign(
+            originalUpdatedAtUtc.AddMinutes(1));
+
+        Assert.False(changed);
+        Assert.Null(ticket.AssigneeId);
+        Assert.Equal(originalUpdatedAtUtc, ticket.UpdatedAtUtc);
+        Assert.Equal(
+            originalConcurrencyToken,
+            ticket.ConcurrencyToken);
+    }
+
+    /// <summary>
+    /// Verifies assignment timestamps must use the UTC time kind.
+    /// </summary>
+    [Fact]
+    public void Assignment_changes_should_reject_non_utc_time()
+    {
+        Ticket ticket = Ticket.Create(
+            Guid.NewGuid(),
+            "Printer is unavailable",
+            "The printer does not respond.");
+        var localTime = new DateTime(
+            2026,
+            8,
+            26,
+            12,
+            0,
+            0,
+            DateTimeKind.Local);
+
+        Assert.Throws<ArgumentException>(() =>
+            ticket.Assign(Guid.NewGuid(), localTime));
+        Assert.Throws<ArgumentException>(() =>
+            ticket.Unassign(localTime));
+
+        Assert.Null(ticket.AssigneeId);
+    }
+
+    /// <summary>
+    /// Verifies a Closed Ticket rejects assignment and unassignment.
+    /// </summary>
+    [Fact]
+    public void Assignment_changes_should_reject_closed_ticket()
+    {
+        Ticket ticket = Ticket.Create(
+            Guid.NewGuid(),
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        Guid assigneeId = Guid.NewGuid();
+        DateTime changedAtUtc = ticket.UpdatedAtUtc;
+
+        ticket.Assign(
+            assigneeId,
+            changedAtUtc = changedAtUtc.AddMinutes(1));
+        ticket.ChangeStatus(
+            TicketStatus.InProgress,
+            changedAtUtc = changedAtUtc.AddMinutes(1));
+        ticket.ChangeStatus(
+            TicketStatus.Resolved,
+            changedAtUtc = changedAtUtc.AddMinutes(1));
+        ticket.ChangeStatus(
+            TicketStatus.Closed,
+            changedAtUtc = changedAtUtc.AddMinutes(1));
+
+        Guid closedConcurrencyToken = ticket.ConcurrencyToken;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ticket.Assign(
+                Guid.NewGuid(),
+                changedAtUtc.AddMinutes(1)));
+        Assert.Throws<InvalidOperationException>(() =>
+            ticket.Unassign(changedAtUtc.AddMinutes(1)));
+
+        Assert.Equal(assigneeId, ticket.AssigneeId);
+        Assert.Equal(closedConcurrencyToken, ticket.ConcurrencyToken);
+    }
+
+    /// <summary>
     /// Verifies an open Ticket can enter active work.
     /// </summary>
     [Fact]
@@ -58,6 +253,7 @@ public sealed class TicketTests
             "Printer is unavailable",
             "The printer does not respond.");
 
+        Guid originalConcurrencyToken = ticket.ConcurrencyToken;
         DateTime changedAtUtc = ticket.UpdatedAtUtc.AddMinutes(1);
 
         ticket.ChangeStatus(
@@ -66,6 +262,9 @@ public sealed class TicketTests
 
         Assert.Equal(TicketStatus.InProgress, ticket.Status);
         Assert.Equal(changedAtUtc, ticket.UpdatedAtUtc);
+        Assert.NotEqual(
+            originalConcurrencyToken,
+            ticket.ConcurrencyToken);
         Assert.Null(ticket.ResolvedAtUtc);
         Assert.Null(ticket.ClosedAtUtc);
     }
@@ -309,5 +508,30 @@ public sealed class TicketTests
 
         Assert.Equal(TicketStatus.Closed, ticket.Status);
         Assert.Equal(changedAtUtc, ticket.ClosedAtUtc);
+    }
+
+    /// <summary>
+    /// Verifies adding a Comment refreshes Ticket concurrency state.
+    /// </summary>
+    [Fact]
+    public void AddComment_should_update_ticket_version()
+    {
+        Ticket ticket = Ticket.Create(
+            Guid.NewGuid(),
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        Guid originalConcurrencyToken = ticket.ConcurrencyToken;
+        DateTime commentedAtUtc = ticket.UpdatedAtUtc.AddMinutes(1);
+
+        ticket.AddComment(
+            Guid.NewGuid(),
+            "We are investigating.",
+            commentedAtUtc);
+
+        Assert.Equal(commentedAtUtc, ticket.UpdatedAtUtc);
+        Assert.NotEqual(
+            originalConcurrencyToken,
+            ticket.ConcurrencyToken);
     }
 }

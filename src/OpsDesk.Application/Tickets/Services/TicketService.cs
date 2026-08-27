@@ -1,3 +1,4 @@
+using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
@@ -9,10 +10,180 @@ namespace OpsDesk.Application.Tickets.Services;
 public sealed class TicketService : ITicketService
 {
     private readonly ITicketRepository _ticketRepository;
+    private readonly IUserRepository _userRepository;
 
-    public TicketService(ITicketRepository ticketRepository)
+    public TicketService(
+        ITicketRepository ticketRepository,
+        IUserRepository userRepository)
     {
         _ticketRepository = ticketRepository;
+        _userRepository = userRepository;
+    }
+
+    /// <summary>
+    /// Authorizes and persists one Ticket assignment change.
+    /// </summary>
+    public async Task<TicketResponse?> AssignAsync(
+        Guid ticketId,
+        Guid assigneeId,
+        Guid actorId,
+        UserRole actorRole,
+        CancellationToken cancellationToken = default)
+    {
+        if (actorRole == UserRole.Customer)
+        {
+            throw new ForbiddenException(
+                "Customers cannot assign tickets.");
+        }
+
+        if (actorRole == UserRole.Agent && assigneeId != actorId)
+        {
+            throw new ForbiddenException(
+                "Agents can only assign tickets to themselves.");
+        }
+
+        Ticket? ticket = actorRole switch
+        {
+            UserRole.Agent =>
+                await _ticketRepository
+                    .GetForAssignmentByAgentAsync(
+                        ticketId,
+                        actorId,
+                        cancellationToken),
+            UserRole.Admin =>
+                await _ticketRepository.GetForUpdateAsync(
+                    ticketId,
+                    cancellationToken),
+            _ => throw new ForbiddenException(
+                "This role cannot assign tickets.")
+        };
+
+        if (ticket is null)
+        {
+            return null;
+        }
+
+        User? assignee = await _userRepository.GetByIdAsync(
+            assigneeId,
+            cancellationToken);
+
+        if (assignee is null || assignee.Role != UserRole.Agent)
+        {
+            throw new ArgumentException(
+                "Assignee must be an existing Agent.",
+                nameof(assigneeId));
+        }
+
+        Guid? previousAssigneeId = ticket.AssigneeId;
+        DateTime changedAtUtc = DateTime.UtcNow;
+        bool assignmentChanged;
+
+        try
+        {
+            assignmentChanged = ticket.Assign(
+                assigneeId,
+                changedAtUtc);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new ConflictException(
+                exception.Message,
+                exception);
+        }
+
+        if (!assignmentChanged)
+        {
+            return MapToResponse(ticket);
+        }
+
+        TicketAssignmentChange assignmentChange =
+            TicketAssignmentChange.Create(
+                ticket.Id,
+                actorId,
+                previousAssigneeId,
+                ticket.AssigneeId,
+                changedAtUtc);
+
+        await _ticketRepository.AddAssignmentChangeAsync(
+            assignmentChange,
+            cancellationToken);
+
+        await _ticketRepository.SaveChangesAsync(cancellationToken);
+
+        return MapToResponse(ticket);
+    }
+
+    /// <summary>
+    /// Authorizes and persists removal of one Ticket assignee.
+    /// </summary>
+    public async Task<TicketResponse?> UnassignAsync(
+        Guid ticketId,
+        Guid actorId,
+        UserRole actorRole,
+        CancellationToken cancellationToken = default)
+    {
+        if (actorRole == UserRole.Customer)
+        {
+            throw new ForbiddenException(
+                "Customers cannot unassign tickets.");
+        }
+
+        Ticket? ticket = actorRole switch
+        {
+            UserRole.Agent =>
+                await _ticketRepository
+                    .GetForAssignmentByAgentAsync(
+                        ticketId,
+                        actorId,
+                        cancellationToken),
+            UserRole.Admin =>
+                await _ticketRepository.GetForUpdateAsync(
+                    ticketId,
+                    cancellationToken),
+            _ => throw new ForbiddenException(
+                "This role cannot unassign tickets.")
+        };
+
+        if (ticket is null)
+        {
+            return null;
+        }
+
+        Guid? previousAssigneeId = ticket.AssigneeId;
+        DateTime changedAtUtc = DateTime.UtcNow;
+        bool assignmentChanged;
+
+        try
+        {
+            assignmentChanged = ticket.Unassign(changedAtUtc);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new ConflictException(
+                exception.Message,
+                exception);
+        }
+
+        if (!assignmentChanged)
+        {
+            return MapToResponse(ticket);
+        }
+
+        TicketAssignmentChange assignmentChange =
+            TicketAssignmentChange.Create(
+                ticket.Id,
+                actorId,
+                previousAssigneeId,
+                ticket.AssigneeId,
+                changedAtUtc);
+
+        await _ticketRepository.AddAssignmentChangeAsync(
+            assignmentChange,
+            cancellationToken);
+
+        await _ticketRepository.SaveChangesAsync(cancellationToken);
+
+        return MapToResponse(ticket);
     }
 
     /// <summary>
@@ -72,6 +243,13 @@ public sealed class TicketService : ITicketService
                 break;
 
             case UserRole.Agent:
+                ticket = await _ticketRepository
+                    .GetForUpdateAssignedToAgentAsync(
+                        ticketId,
+                        authorId,
+                        cancellationToken);
+                break;
+
             case UserRole.Admin:
                 ticket = await _ticketRepository.GetForUpdateAsync(
                     ticketId,
@@ -169,6 +347,13 @@ public sealed class TicketService : ITicketService
                 break;
 
             case UserRole.Agent:
+                ticket = await _ticketRepository
+                    .GetForUpdateAssignedToAgentAsync(
+                        ticketId,
+                        actorId,
+                        cancellationToken);
+                break;
+
             case UserRole.Admin:
                 ticket = await _ticketRepository.GetForUpdateAsync(
                     ticketId,
@@ -295,7 +480,12 @@ public sealed class TicketService : ITicketService
                     ticketId,
                     viewerId,
                     cancellationToken),
-            UserRole.Agent or UserRole.Admin =>
+            UserRole.Agent =>
+                _ticketRepository.GetByIdForAgentAsync(
+                    ticketId,
+                    viewerId,
+                    cancellationToken),
+            UserRole.Admin =>
                 _ticketRepository.GetByIdAsync(
                     ticketId,
                     cancellationToken),

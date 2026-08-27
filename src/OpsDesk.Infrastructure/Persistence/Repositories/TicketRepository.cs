@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Entities;
 
@@ -88,6 +89,24 @@ public sealed class TicketRepository : ITicketRepository
     }
 
     /// <summary>
+    /// Retrieves an unassigned or Agent-owned Ticket as read-only data.
+    /// </summary>
+    public Task<Ticket?> GetByIdForAgentAsync(
+        Guid ticketId,
+        Guid agentId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Tickets
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                ticket =>
+                    ticket.Id == ticketId &&
+                    (ticket.AssigneeId == null ||
+                        ticket.AssigneeId == agentId),
+                cancellationToken);
+    }
+
+    /// <summary>
     /// Retrieves one Ticket with change tracking for a write operation.
     /// </summary>
     public Task<Ticket?> GetForUpdateAsync(
@@ -115,6 +134,37 @@ public sealed class TicketRepository : ITicketRepository
     }
 
     /// <summary>
+    /// Retrieves only an Agent-owned Ticket for a tracked write operation.
+    /// </summary>
+    public Task<Ticket?> GetForUpdateAssignedToAgentAsync(
+        Guid ticketId,
+        Guid agentId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Tickets.SingleOrDefaultAsync(
+            ticket =>
+                ticket.Id == ticketId &&
+                ticket.AssigneeId == agentId,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Retrieves an unassigned or Agent-owned Ticket for assignment changes.
+    /// </summary>
+    public Task<Ticket?> GetForAssignmentByAgentAsync(
+        Guid ticketId,
+        Guid agentId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Tickets.SingleOrDefaultAsync(
+            ticket =>
+                ticket.Id == ticketId &&
+                (ticket.AssigneeId == null ||
+                    ticket.AssigneeId == agentId),
+            cancellationToken);
+    }
+
+    /// <summary>
     /// Adds one status-change record to the EF Core change tracker.
     /// </summary>
     public async Task AddStatusChangeAsync(
@@ -127,12 +177,36 @@ public sealed class TicketRepository : ITicketRepository
     }
 
     /// <summary>
-    /// Saves all tracked changes in the current DbContext scope.
+    /// Adds one assignment activity to the EF Core change tracker.
     /// </summary>
-    public Task SaveChangesAsync(
+    public async Task AddAssignmentChangeAsync(
+        TicketAssignmentChange assignmentChange,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.TicketAssignmentChanges.AddAsync(
+            assignmentChange,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Saves all tracked changes in the current DbContext scope.
+    /// </summary>
+    public async Task SaveChangesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+            when (exception.Entries.Any(
+                entry => entry.Entity is Ticket))
+        {
+            throw new ConflictException(
+                "Ticket was changed by another request. " +
+                "Reload it and try again.",
+                exception);
+        }
     }
 
     /// <summary>

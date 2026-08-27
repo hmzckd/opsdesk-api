@@ -67,6 +67,11 @@ public sealed class TicketConfiguration :
             .HasColumnName("closed_at_utc")
             .HasColumnType("timestamp with time zone");
 
+        builder.Property(ticket => ticket.ConcurrencyToken)
+            .HasColumnName("concurrency_token")
+            .IsRequired()
+            .IsConcurrencyToken();
+
         builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(ticket => ticket.RequesterId)

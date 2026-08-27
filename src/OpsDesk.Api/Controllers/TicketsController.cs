@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OpsDesk.Application.Authorization;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Enums;
@@ -17,6 +18,92 @@ public sealed class TicketsController : ControllerBase
     public TicketsController(ITicketService ticketService)
     {
         _ticketService = ticketService;
+    }
+
+    /// <summary>
+    /// Assigns a Ticket to an Agent within the actor's ownership scope.
+    /// </summary>
+    [HttpPut("{id:guid}/assignee")]
+    [Authorize(Policy = AuthorizationPolicies.AgentOrAdmin)]
+    [ProducesResponseType<TicketResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TicketResponse>> Assign(
+        Guid id,
+        AssignTicketRequest request,
+        CancellationToken cancellationToken)
+    {
+        string? userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        string? userRoleClaim =
+            User.FindFirstValue(ClaimTypes.Role);
+
+        if (!Guid.TryParse(userIdClaim, out Guid actorId) ||
+            !Enum.TryParse(
+                userRoleClaim,
+                ignoreCase: true,
+                out UserRole actorRole) ||
+            !Enum.IsDefined(actorRole))
+        {
+            return Unauthorized();
+        }
+
+        TicketResponse? response =
+            await _ticketService.AssignAsync(
+                id,
+                request.AssigneeId,
+                actorId,
+                actorRole,
+                cancellationToken);
+
+        return response is null ? NotFound() : Ok(response);
+    }
+
+    /// <summary>
+    /// Removes a Ticket's assignee within the actor's ownership scope.
+    /// </summary>
+    [HttpDelete("{id:guid}/assignee")]
+    [Authorize(Policy = AuthorizationPolicies.AgentOrAdmin)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Unassign(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        string? userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        string? userRoleClaim =
+            User.FindFirstValue(ClaimTypes.Role);
+
+        if (!Guid.TryParse(userIdClaim, out Guid actorId) ||
+            !Enum.TryParse(
+                userRoleClaim,
+                ignoreCase: true,
+                out UserRole actorRole) ||
+            !Enum.IsDefined(actorRole))
+        {
+            return Unauthorized();
+        }
+
+        TicketResponse? response =
+            await _ticketService.UnassignAsync(
+                id,
+                actorId,
+                actorRole,
+                cancellationToken);
+
+        return response is null ? NotFound() : NoContent();
     }
 
     /// <summary>

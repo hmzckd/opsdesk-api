@@ -13,7 +13,7 @@ A User who requests support and follows the progress of their Tickets.
 _Avoid_: Client, end user
 
 **Agent**:
-A support User who investigates and resolves Tickets.
+A support User who investigates and resolves unassigned Tickets they claim or Tickets currently assigned to them.
 _Avoid_: Operator, technician
 
 **Admin**:
@@ -31,6 +31,14 @@ _Avoid_: Owner, creator, customer ID
 **Assignee**:
 The Agent currently responsible for handling a Ticket. A Ticket can be unassigned.
 _Avoid_: Owner, handler
+
+**Ticket Assignment Change**:
+A permanent record that identifies who assigned or unassigned a Ticket, the previous Assignee, the new Assignee, and when the change happened.
+_Avoid_: Status change, comment
+
+**Unassigned Ticket**:
+A Ticket that does not currently have an Assignee. Agents can discover and claim it, but must claim it before changing status or adding a Comment.
+_Avoid_: Unowned Ticket
 
 **Ticket Status**:
 The current lifecycle position of a Ticket.

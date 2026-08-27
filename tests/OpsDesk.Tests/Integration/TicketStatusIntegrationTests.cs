@@ -42,6 +42,7 @@ public sealed class TicketStatusIntegrationTests
 
         AuthResponse agent = await CreateAgentAsync(client);
         SetBearerToken(client, agent.AccessToken);
+        await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         var request = new
         {
@@ -80,6 +81,7 @@ public sealed class TicketStatusIntegrationTests
 
         AuthResponse agent = await CreateAgentAsync(client);
         SetBearerToken(client, agent.AccessToken);
+        await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         HttpResponseMessage response =
             await client.PatchAsJsonAsync(
@@ -125,6 +127,7 @@ public sealed class TicketStatusIntegrationTests
 
         AuthResponse agent = await CreateAgentAsync(client);
         SetBearerToken(client, agent.AccessToken);
+        await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         Assert.Equal(
             HttpStatusCode.OK,
@@ -225,6 +228,7 @@ public sealed class TicketStatusIntegrationTests
 
         AuthResponse agent = await CreateAgentAsync(client);
         SetBearerToken(client, agent.AccessToken);
+        await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         HttpResponseMessage response =
             await client.PatchAsJsonAsync(
@@ -299,6 +303,7 @@ public sealed class TicketStatusIntegrationTests
 
         AuthResponse agent = await CreateAgentAsync(client);
         SetBearerToken(client, agent.AccessToken);
+        await AssignTicketAsync(client, ticket.Id, agent.UserId);
         Assert.Equal(
             HttpStatusCode.OK,
             (await ChangeStatusAsync(
@@ -362,6 +367,14 @@ public sealed class TicketStatusIntegrationTests
         AuthResponse supportUser =
             await CreateStaffUserAsync(client, supportRole);
         SetBearerToken(client, supportUser.AccessToken);
+
+        if (supportRole == UserRole.Agent)
+        {
+            await AssignTicketAsync(
+                client,
+                ticket.Id,
+                supportUser.UserId);
+        }
 
         Assert.Equal(
             HttpStatusCode.OK,
@@ -494,6 +507,7 @@ public sealed class TicketStatusIntegrationTests
 
         AuthResponse agent = await CreateAgentAsync(client);
         SetBearerToken(client, agent.AccessToken);
+        await AssignTicketAsync(client, ticket.Id, agent.UserId);
         Assert.Equal(
             HttpStatusCode.OK,
             (await ChangeStatusAsync(
@@ -524,6 +538,7 @@ public sealed class TicketStatusIntegrationTests
 
         AuthResponse agent = await CreateAgentAsync(client);
         SetBearerToken(client, agent.AccessToken);
+        await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         string[] statuses =
         [
@@ -644,6 +659,21 @@ public sealed class TicketStatusIntegrationTests
         return client.PatchAsJsonAsync(
             $"/tickets/{ticketId}/status",
             new { status });
+    }
+
+    /// <summary>
+    /// Claims a Ticket for the Agent used by a lifecycle test.
+    /// </summary>
+    private static async Task AssignTicketAsync(
+        HttpClient client,
+        Guid ticketId,
+        Guid agentId)
+    {
+        HttpResponseMessage response = await client.PutAsJsonAsync(
+            $"/tickets/{ticketId}/assignee",
+            new { assigneeId = agentId });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     /// <summary>

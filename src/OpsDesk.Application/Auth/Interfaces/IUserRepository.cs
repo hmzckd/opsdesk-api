@@ -14,6 +14,13 @@ public interface IUserRepository
         string email,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Retrieves one User by identity without tracking it for changes.
+    /// </summary>
+    Task<User?> GetByIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(
         User user,
         CancellationToken cancellationToken = default);

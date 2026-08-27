@@ -276,6 +276,7 @@ public sealed class TicketCommentIntegrationTests
         AuthResponse agent =
             await CreateStaffUserAsync(client, UserRole.Agent);
         SetBearerToken(client, agent.AccessToken);
+        await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         Assert.Equal(
             HttpStatusCode.OK,
@@ -438,6 +439,14 @@ public sealed class TicketCommentIntegrationTests
             await CreateStaffUserAsync(client, supportRole);
         SetBearerToken(client, supportUser.AccessToken);
 
+        if (supportRole == UserRole.Agent)
+        {
+            await AssignTicketAsync(
+                client,
+                ticket.Id,
+                supportUser.UserId);
+        }
+
         HttpResponseMessage response = await client.PostAsJsonAsync(
             $"/tickets/{ticket.Id}/comments",
             new { content = "We are investigating this problem." });
@@ -468,6 +477,7 @@ public sealed class TicketCommentIntegrationTests
         AuthResponse agent =
             await CreateStaffUserAsync(client, UserRole.Agent);
         SetBearerToken(client, agent.AccessToken);
+        await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         Assert.Equal(
             HttpStatusCode.OK,
@@ -644,6 +654,21 @@ public sealed class TicketCommentIntegrationTests
         return client.PatchAsJsonAsync(
             $"/tickets/{ticketId}/status",
             new { status });
+    }
+
+    /// <summary>
+    /// Claims a Ticket for the Agent used by a Comment test.
+    /// </summary>
+    private static async Task AssignTicketAsync(
+        HttpClient client,
+        Guid ticketId,
+        Guid agentId)
+    {
+        HttpResponseMessage response = await client.PutAsJsonAsync(
+            $"/tickets/{ticketId}/assignee",
+            new { assigneeId = agentId });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     /// <summary>

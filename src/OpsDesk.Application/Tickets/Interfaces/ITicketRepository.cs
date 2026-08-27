@@ -41,6 +41,14 @@ public interface ITicketRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Retrieves one Ticket when it is unassigned or belongs to the Agent.
+    /// </summary>
+    Task<Ticket?> GetByIdForAgentAsync(
+        Guid ticketId,
+        Guid agentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves one Ticket with EF Core change tracking enabled.
     /// </summary>
     Task<Ticket?> GetForUpdateAsync(
@@ -56,10 +64,33 @@ public interface ITicketRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Retrieves one Agent-owned Ticket with change tracking enabled.
+    /// </summary>
+    Task<Ticket?> GetForUpdateAssignedToAgentAsync(
+        Guid ticketId,
+        Guid agentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves an unassigned or Agent-owned Ticket for assignment changes.
+    /// </summary>
+    Task<Ticket?> GetForAssignmentByAgentAsync(
+        Guid ticketId,
+        Guid agentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds one Ticket status-change record to the current transaction.
     /// </summary>
     Task AddStatusChangeAsync(
         TicketStatusChange statusChange,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds one Ticket assignment activity to the current transaction.
+    /// </summary>
+    Task AddAssignmentChangeAsync(
+        TicketAssignmentChange assignmentChange,
         CancellationToken cancellationToken = default);
 
     /// <summary>

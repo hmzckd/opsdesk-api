@@ -33,6 +33,8 @@ public sealed class Ticket
 
     public DateTime? ClosedAtUtc { get; private set; }
 
+    public Guid ConcurrencyToken { get; private set; }
+
     /// <summary>
     /// Creates a valid Ticket with normalized text and server-owned defaults.
     /// </summary>
@@ -84,8 +86,78 @@ public sealed class Ticket
             CreatedAtUtc = nowUtc,
             UpdatedAtUtc = nowUtc,
             ResolvedAtUtc = null,
-            ClosedAtUtc = null
+            ClosedAtUtc = null,
+            ConcurrencyToken = Guid.NewGuid()
         };
+    }
+
+    /// <summary>
+    /// Assigns the Ticket and reports whether ownership actually changed.
+    /// </summary>
+    public bool Assign(
+        Guid assigneeId,
+        DateTime changedAtUtc)
+    {
+        if (assigneeId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Assignee ID cannot be empty.",
+                nameof(assigneeId));
+        }
+
+        if (changedAtUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException(
+                "Assignment change time must be UTC.",
+                nameof(changedAtUtc));
+        }
+
+        if (Status == TicketStatus.Closed)
+        {
+            throw new InvalidOperationException(
+                "Closed tickets cannot change assignment.");
+        }
+
+        if (AssigneeId == assigneeId)
+        {
+            return false;
+        }
+
+        AssigneeId = assigneeId;
+        UpdatedAtUtc = changedAtUtc;
+        ConcurrencyToken = Guid.NewGuid();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Removes the assignee and reports whether ownership actually changed.
+    /// </summary>
+    public bool Unassign(DateTime changedAtUtc)
+    {
+        if (changedAtUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException(
+                "Assignment change time must be UTC.",
+                nameof(changedAtUtc));
+        }
+
+        if (Status == TicketStatus.Closed)
+        {
+            throw new InvalidOperationException(
+                "Closed tickets cannot change assignment.");
+        }
+
+        if (AssigneeId is null)
+        {
+            return false;
+        }
+
+        AssigneeId = null;
+        UpdatedAtUtc = changedAtUtc;
+        ConcurrencyToken = Guid.NewGuid();
+
+        return true;
     }
 
     /// <summary>
@@ -132,6 +204,7 @@ public sealed class Ticket
 
         Status = newStatus;
         UpdatedAtUtc = changedAtUtc;
+        ConcurrencyToken = Guid.NewGuid();
 
         if (newStatus == TicketStatus.Resolved)
         {
@@ -169,6 +242,7 @@ public sealed class Ticket
             createdAtUtc);
 
         UpdatedAtUtc = createdAtUtc;
+        ConcurrencyToken = Guid.NewGuid();
 
         return comment;
     }
