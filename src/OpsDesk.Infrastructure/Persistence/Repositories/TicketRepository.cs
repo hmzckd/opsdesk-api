@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using OpsDesk.Application.Common.Exceptions;
+using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Entities;
+using OpsDesk.Domain.Enums;
 
 namespace OpsDesk.Infrastructure.Persistence.Repositories;
 
@@ -12,6 +14,115 @@ public sealed class TicketRepository : ITicketRepository
     public TicketRepository(OpsDeskDbContext dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    /// <summary>
+    /// Reads existing activity sources, enriches their Users, and orders them.
+    /// </summary>
+    public async Task<IReadOnlyList<TicketActivityResponse>>
+        GetActivityAsync(
+            Guid ticketId,
+            bool includeAssignmentChanges,
+            CancellationToken cancellationToken = default)
+    {
+        List<TicketActivityResponse> comments = await (
+            from comment in _dbContext.TicketComments.AsNoTracking()
+            join actor in _dbContext.Users.AsNoTracking()
+                on comment.AuthorId equals actor.Id
+            where comment.TicketId == ticketId
+            select new TicketActivityResponse(
+                comment.Id,
+                TicketActivityType.CommentAdded,
+                new TicketActivityUserResponse(
+                    actor.Id,
+                    actor.FirstName,
+                    actor.LastName,
+                    actor.Role),
+                comment.CreatedAtUtc,
+                comment.Content,
+                null,
+                null,
+                null,
+                null))
+            .ToListAsync(cancellationToken);
+
+        List<TicketActivityResponse> statusChanges = await (
+            from change in _dbContext.TicketStatusChanges.AsNoTracking()
+            join actor in _dbContext.Users.AsNoTracking()
+                on change.ActorId equals actor.Id
+            where change.TicketId == ticketId
+            select new TicketActivityResponse(
+                change.Id,
+                TicketActivityType.StatusChanged,
+                new TicketActivityUserResponse(
+                    actor.Id,
+                    actor.FirstName,
+                    actor.LastName,
+                    actor.Role),
+                change.CreatedAtUtc,
+                null,
+                change.PreviousStatus,
+                change.NewStatus,
+                null,
+                null))
+            .ToListAsync(cancellationToken);
+
+        IReadOnlyList<TicketActivityResponse> assignmentChanges = [];
+
+        if (includeAssignmentChanges)
+        {
+            assignmentChanges = await (
+                from change in
+                    _dbContext.TicketAssignmentChanges.AsNoTracking()
+                join actor in _dbContext.Users.AsNoTracking()
+                    on change.ActorId equals actor.Id
+                join previousAssignee in _dbContext.Users.AsNoTracking()
+                    on change.PreviousAssigneeId equals
+                        (Guid?)previousAssignee.Id
+                    into previousAssignees
+                from previousAssignee in
+                    previousAssignees.DefaultIfEmpty()
+                join newAssignee in _dbContext.Users.AsNoTracking()
+                    on change.NewAssigneeId equals (Guid?)newAssignee.Id
+                    into newAssignees
+                from newAssignee in newAssignees.DefaultIfEmpty()
+                where change.TicketId == ticketId
+                select new TicketActivityResponse(
+                    change.Id,
+                    TicketActivityType.AssignmentChanged,
+                    new TicketActivityUserResponse(
+                        actor.Id,
+                        actor.FirstName,
+                        actor.LastName,
+                        actor.Role),
+                    change.CreatedAtUtc,
+                    null,
+                    null,
+                    null,
+                    previousAssignee == null
+                        ? null
+                        : new TicketActivityUserResponse(
+                            previousAssignee.Id,
+                            previousAssignee.FirstName,
+                            previousAssignee.LastName,
+                            previousAssignee.Role),
+                    newAssignee == null
+                        ? null
+                        : new TicketActivityUserResponse(
+                            newAssignee.Id,
+                            newAssignee.FirstName,
+                            newAssignee.LastName,
+                            newAssignee.Role)))
+                .ToListAsync(cancellationToken);
+        }
+
+        return comments
+            .Concat(statusChanges)
+            .Concat(assignmentChanges)
+            .OrderBy(item => item.CreatedAtUtc)
+            .ThenBy(item => item.Type)
+            .ThenBy(item => item.Id)
+            .ToArray();
     }
 
     /// <summary>

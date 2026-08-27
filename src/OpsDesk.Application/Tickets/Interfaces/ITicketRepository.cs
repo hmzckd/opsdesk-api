@@ -1,9 +1,18 @@
+using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Domain.Entities;
 
 namespace OpsDesk.Application.Tickets.Interfaces;
 
 public interface ITicketRepository
 {
+    /// <summary>
+    /// Retrieves one Ticket's combined timeline in a stable chronological order.
+    /// </summary>
+    Task<IReadOnlyList<TicketActivityResponse>> GetActivityAsync(
+        Guid ticketId,
+        bool includeAssignmentChanges,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Retrieves Ticket Comments in a stable chronological order.
     /// </summary>

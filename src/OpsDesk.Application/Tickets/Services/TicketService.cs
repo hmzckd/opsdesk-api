@@ -21,6 +21,36 @@ public sealed class TicketService : ITicketService
     }
 
     /// <summary>
+    /// Authorizes a viewer and returns the role-appropriate Ticket timeline.
+    /// </summary>
+    public async Task<IReadOnlyList<TicketActivityResponse>?>
+        GetActivityAsync(
+            Guid ticketId,
+            Guid viewerId,
+            UserRole viewerRole,
+            CancellationToken cancellationToken = default)
+    {
+        Ticket? visibleTicket = await GetVisibleTicketAsync(
+            ticketId,
+            viewerId,
+            viewerRole,
+            cancellationToken);
+
+        if (visibleTicket is null)
+        {
+            return null;
+        }
+
+        bool includeAssignmentChanges =
+            viewerRole is UserRole.Agent or UserRole.Admin;
+
+        return await _ticketRepository.GetActivityAsync(
+            ticketId,
+            includeAssignmentChanges,
+            cancellationToken);
+    }
+
+    /// <summary>
     /// Authorizes and persists one Ticket assignment change.
     /// </summary>
     public async Task<TicketResponse?> AssignAsync(

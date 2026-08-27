@@ -21,6 +21,46 @@ public sealed class TicketsController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves one visible Ticket's role-appropriate activity timeline.
+    /// </summary>
+    [HttpGet("{id:guid}/activity")]
+    [ProducesResponseType<IReadOnlyList<TicketActivityResponse>>(
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<
+        ActionResult<IReadOnlyList<TicketActivityResponse>>>
+        GetActivity(
+            Guid id,
+            CancellationToken cancellationToken)
+    {
+        string? userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        string? userRoleClaim =
+            User.FindFirstValue(ClaimTypes.Role);
+
+        if (!Guid.TryParse(userIdClaim, out Guid viewerId) ||
+            !Enum.TryParse(
+                userRoleClaim,
+                ignoreCase: true,
+                out UserRole viewerRole) ||
+            !Enum.IsDefined(viewerRole))
+        {
+            return Unauthorized();
+        }
+
+        IReadOnlyList<TicketActivityResponse>? response =
+            await _ticketService.GetActivityAsync(
+                id,
+                viewerId,
+                viewerRole,
+                cancellationToken);
+
+        return response is null ? NotFound() : Ok(response);
+    }
+
+    /// <summary>
     /// Assigns a Ticket to an Agent within the actor's ownership scope.
     /// </summary>
     [HttpPut("{id:guid}/assignee")]

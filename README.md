@@ -19,6 +19,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 - Assignment activity with optimistic concurrency protection
 - Role-aware Ticket lifecycle transitions with persisted status history
 - Public Ticket comments with role-aware visibility
+- Combined Ticket activity timeline with safe actor summaries
 - Requester-confirmed closure after support resolution
 - Email, password, and Ticket input validation
 - Idempotent admin-user seeding from local secrets
@@ -84,6 +85,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `GET` | `/tickets/{id}/status-history` | Authenticated and visible | Read chronological status history with actor IDs |
 | `POST` | `/tickets/{id}/comments` | Authenticated and visible | Add a public comment with server-owned author and time |
 | `GET` | `/tickets/{id}/comments` | Authenticated and visible | Read public comments from oldest to newest |
+| `GET` | `/tickets/{id}/activity` | Authenticated and visible | Read the role-appropriate combined comment, status, and assignment timeline |
 | `GET` | `/admin/access` | Admin | Verify the `AdminOnly` policy |
 | `GET` | `/health` | Anonymous | Check API process health |
 | `GET` | `/swagger` | Anonymous | Open interactive API documentation |
@@ -214,6 +216,9 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - Agents and Admins resolve Tickets; only the requester confirms final closure.
 - Comment author identity and creation time come from the authenticated server request, not client input.
 - Comment reads use creation time and Comment ID for deterministic chronological ordering.
+- The activity endpoint combines existing records instead of duplicating them in a separate activity table.
+- Customers see public comments and status changes; assignment history remains internal to Agents and Admins.
+- Activity items include safe actor summaries and use time, type, then ID for deterministic ordering.
 - Global exception handling maps expected failures to consistent API responses.
 
 ## Roadmap

@@ -66,6 +66,10 @@ _Avoid_: Appeal, dispute
 A public message added to a Ticket conversation by an authenticated User. A Ticket Comment keeps its author and creation time permanently.
 _Avoid_: Internal note, audit entry
 
+**Ticket Activity Timeline**:
+A chronological read view that combines existing Ticket Comments, Ticket Status Changes, and role-appropriate Ticket Assignment Changes. It is not a separate permanent record. Customers see public activity only; Agents and Admins can also see internal assignment activity.
+_Avoid_: Audit log, activity table
+
 **Ticket Priority**:
 The operational urgency assigned to a Ticket. V2 supports Low, Medium, High, and Urgent priority.
 _Avoid_: Severity, importance

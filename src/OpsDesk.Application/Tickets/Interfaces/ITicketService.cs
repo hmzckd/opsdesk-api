@@ -6,6 +6,15 @@ namespace OpsDesk.Application.Tickets.Interfaces;
 public interface ITicketService
 {
     /// <summary>
+    /// Retrieves the role-appropriate combined timeline for a visible Ticket.
+    /// </summary>
+    Task<IReadOnlyList<TicketActivityResponse>?> GetActivityAsync(
+        Guid ticketId,
+        Guid viewerId,
+        UserRole viewerRole,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Assigns a visible Ticket to an Agent.
     /// </summary>
     Task<TicketResponse?> AssignAsync(
