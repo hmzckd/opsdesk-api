@@ -53,6 +53,16 @@ public interface ITicketService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reopens a requester's resolved Ticket with one public reason.
+    /// </summary>
+    Task<ReopenTicketResponse?> ReopenAsync(
+        Guid ticketId,
+        Guid requesterId,
+        UserRole requesterRole,
+        ReopenTicketRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves visible status history for an authenticated User.
     /// </summary>
     Task<IReadOnlyList<TicketStatusChangeResponse>?>

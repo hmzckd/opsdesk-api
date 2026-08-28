@@ -21,6 +21,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 - Public Ticket comments with role-aware visibility
 - Combined Ticket activity timeline with safe actor summaries
 - Requester-confirmed closure after support resolution
+- Requester-only reopen flow with a required public reason
 - Email, password, and Ticket input validation
 - Idempotent admin-user seeding from local secrets
 - Standardized Problem Details error responses
@@ -82,6 +83,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `PUT` | `/tickets/{id}/assignee` | Agent or Admin | Assign a Ticket to an Agent; Agents can only select themselves |
 | `DELETE` | `/tickets/{id}/assignee` | Agent or Admin | Remove the current assignee within the caller's ownership scope |
 | `PATCH` | `/tickets/{id}/status` | Authenticated and authorized | Change status and record the transition |
+| `POST` | `/tickets/{id}/reopen` | Ticket requester | Reopen a resolved Ticket and store the required public reason atomically |
 | `GET` | `/tickets/{id}/status-history` | Authenticated and visible | Read chronological status history with actor IDs |
 | `POST` | `/tickets/{id}/comments` | Authenticated and visible | Add a public comment with server-owned author and time |
 | `GET` | `/tickets/{id}/comments` | Authenticated and visible | Read public comments from oldest to newest |
@@ -97,6 +99,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 - `priority` is optional and defaults to `medium`.
 - Priority values are `low`, `medium`, `high`, and `urgent`.
 - Comment content is required and accepts at most 4,000 characters.
+- Reopen reason is required and uses the same 4,000-character limit as a public comment.
 - OpenAPI publishes required fields, string limits, and enum values for API clients and frontend controls.
 
 ## Run Locally
@@ -214,6 +217,8 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - Every real assignment change stores the actor, previous assignee, new assignee, and server-owned UTC time.
 - Ticket status and its history record are saved atomically in one database transaction.
 - Agents and Admins resolve Tickets; only the requester confirms final closure.
+- Only the requester can reopen a resolved Ticket, through the dedicated endpoint with a public reason.
+- Reopen updates the Ticket, public reason Comment, and status-history record in one database transaction.
 - Comment author identity and creation time come from the authenticated server request, not client input.
 - Comment reads use creation time and Comment ID for deterministic chronological ordering.
 - The activity endpoint combines existing records instead of duplicating them in a separate activity table.

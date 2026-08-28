@@ -378,10 +378,10 @@ public sealed class TicketTests
     }
 
     /// <summary>
-    /// Verifies reopening a resolved Ticket clears its resolution time.
+    /// Verifies generic status changes cannot bypass the reopen workflow.
     /// </summary>
     [Fact]
-    public void ChangeStatus_should_reopen_resolved_ticket()
+    public void ChangeStatus_should_reject_resolved_to_in_progress()
     {
         Ticket ticket = Ticket.Create(
             Guid.NewGuid(),
@@ -395,14 +395,157 @@ public sealed class TicketTests
         ticket.ChangeStatus(
             TicketStatus.Resolved,
             changedAtUtc = changedAtUtc.AddMinutes(1));
+
+        Guid resolvedConcurrencyToken = ticket.ConcurrencyToken;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ticket.ChangeStatus(
+                TicketStatus.InProgress,
+                changedAtUtc.AddMinutes(1)));
+
+        Assert.Equal(TicketStatus.Resolved, ticket.Status);
+        Assert.Equal(changedAtUtc, ticket.UpdatedAtUtc);
+        Assert.Equal(changedAtUtc, ticket.ResolvedAtUtc);
+        Assert.Null(ticket.ClosedAtUtc);
+        Assert.Equal(
+            resolvedConcurrencyToken,
+            ticket.ConcurrencyToken);
+    }
+
+    /// <summary>
+    /// Verifies Reopen changes state and returns the normalized public reason.
+    /// </summary>
+    [Fact]
+    public void Reopen_should_change_status_and_create_reason_comment()
+    {
+        Guid requesterId = Guid.NewGuid();
+        Ticket ticket = Ticket.Create(
+            requesterId,
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        DateTime changedAtUtc = ticket.UpdatedAtUtc;
         ticket.ChangeStatus(
             TicketStatus.InProgress,
             changedAtUtc = changedAtUtc.AddMinutes(1));
+        ticket.ChangeStatus(
+            TicketStatus.Resolved,
+            changedAtUtc = changedAtUtc.AddMinutes(1));
+
+        Guid resolvedConcurrencyToken = ticket.ConcurrencyToken;
+        DateTime reopenedAtUtc = changedAtUtc.AddMinutes(1);
+
+        TicketComment reasonComment = ticket.Reopen(
+            requesterId,
+            "  The proposed solution did not work.  ",
+            reopenedAtUtc);
 
         Assert.Equal(TicketStatus.InProgress, ticket.Status);
-        Assert.Equal(changedAtUtc, ticket.UpdatedAtUtc);
+        Assert.Equal(reopenedAtUtc, ticket.UpdatedAtUtc);
         Assert.Null(ticket.ResolvedAtUtc);
-        Assert.Null(ticket.ClosedAtUtc);
+        Assert.NotEqual(
+            resolvedConcurrencyToken,
+            ticket.ConcurrencyToken);
+        Assert.Equal(ticket.Id, reasonComment.TicketId);
+        Assert.Equal(requesterId, reasonComment.AuthorId);
+        Assert.Equal(
+            "The proposed solution did not work.",
+            reasonComment.Content);
+        Assert.Equal(reopenedAtUtc, reasonComment.CreatedAtUtc);
+    }
+
+    /// <summary>
+    /// Verifies a different User cannot invoke the Domain reopen behavior.
+    /// </summary>
+    [Fact]
+    public void Reopen_should_reject_non_requester_without_mutating_ticket()
+    {
+        Guid requesterId = Guid.NewGuid();
+        Ticket ticket = Ticket.Create(
+            requesterId,
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        DateTime changedAtUtc = ticket.UpdatedAtUtc;
+        ticket.ChangeStatus(
+            TicketStatus.InProgress,
+            changedAtUtc = changedAtUtc.AddMinutes(1));
+        ticket.ChangeStatus(
+            TicketStatus.Resolved,
+            changedAtUtc = changedAtUtc.AddMinutes(1));
+
+        Guid originalConcurrencyToken = ticket.ConcurrencyToken;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ticket.Reopen(
+                Guid.NewGuid(),
+                "This User is not the requester.",
+                changedAtUtc.AddMinutes(1)));
+
+        Assert.Equal(TicketStatus.Resolved, ticket.Status);
+        Assert.Equal(changedAtUtc, ticket.UpdatedAtUtc);
+        Assert.Equal(changedAtUtc, ticket.ResolvedAtUtc);
+        Assert.Equal(originalConcurrencyToken, ticket.ConcurrencyToken);
+    }
+
+    /// <summary>
+    /// Verifies an unresolved Ticket cannot enter the reopen workflow.
+    /// </summary>
+    [Fact]
+    public void Reopen_should_reject_non_resolved_ticket()
+    {
+        Guid requesterId = Guid.NewGuid();
+        Ticket ticket = Ticket.Create(
+            requesterId,
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        DateTime originalUpdatedAtUtc = ticket.UpdatedAtUtc;
+        Guid originalConcurrencyToken = ticket.ConcurrencyToken;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ticket.Reopen(
+                requesterId,
+                "The Ticket is not resolved.",
+                originalUpdatedAtUtc.AddMinutes(1)));
+
+        Assert.Equal(TicketStatus.Open, ticket.Status);
+        Assert.Equal(originalUpdatedAtUtc, ticket.UpdatedAtUtc);
+        Assert.Equal(originalConcurrencyToken, ticket.ConcurrencyToken);
+    }
+
+    /// <summary>
+    /// Verifies an invalid reason is rejected before lifecycle mutation.
+    /// </summary>
+    [Fact]
+    public void Reopen_should_reject_invalid_reason_without_mutating_ticket()
+    {
+        Guid requesterId = Guid.NewGuid();
+        Ticket ticket = Ticket.Create(
+            requesterId,
+            "Printer is unavailable",
+            "The printer does not respond.");
+
+        DateTime changedAtUtc = ticket.UpdatedAtUtc;
+        ticket.ChangeStatus(
+            TicketStatus.InProgress,
+            changedAtUtc = changedAtUtc.AddMinutes(1));
+        ticket.ChangeStatus(
+            TicketStatus.Resolved,
+            changedAtUtc = changedAtUtc.AddMinutes(1));
+
+        Guid originalConcurrencyToken = ticket.ConcurrencyToken;
+
+        Assert.Throws<ArgumentException>(() =>
+            ticket.Reopen(
+                requesterId,
+                "   ",
+                changedAtUtc.AddMinutes(1)));
+
+        Assert.Equal(TicketStatus.Resolved, ticket.Status);
+        Assert.Equal(changedAtUtc, ticket.UpdatedAtUtc);
+        Assert.Equal(changedAtUtc, ticket.ResolvedAtUtc);
+        Assert.Equal(originalConcurrencyToken, ticket.ConcurrencyToken);
     }
 
     /// <summary>

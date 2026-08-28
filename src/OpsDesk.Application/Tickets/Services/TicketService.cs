@@ -321,6 +321,75 @@ public sealed class TicketService : ITicketService
     }
 
     /// <summary>
+    /// Reopens a requester's resolved Ticket and persists its public reason.
+    /// </summary>
+    public async Task<ReopenTicketResponse?> ReopenAsync(
+        Guid ticketId,
+        Guid requesterId,
+        UserRole requesterRole,
+        ReopenTicketRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (requesterRole != UserRole.Customer)
+        {
+            throw new ForbiddenException(
+                "Only the Ticket requester can reopen a Ticket.");
+        }
+
+        Ticket? ticket =
+            await _ticketRepository.GetForUpdateForRequesterAsync(
+                ticketId,
+                requesterId,
+                cancellationToken);
+
+        if (ticket is null)
+        {
+            return null;
+        }
+
+        TicketStatus previousStatus = ticket.Status;
+        DateTime reopenedAtUtc = DateTime.UtcNow;
+        TicketComment reasonComment;
+
+        try
+        {
+            reasonComment = ticket.Reopen(
+                requesterId,
+                request.Reason,
+                reopenedAtUtc);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new ConflictException(
+                exception.Message,
+                exception);
+        }
+
+        TicketStatusChange statusChange = TicketStatusChange.Create(
+            ticket.Id,
+            requesterId,
+            previousStatus,
+            ticket.Status,
+            reopenedAtUtc);
+
+        await _ticketRepository.AddCommentAsync(
+            reasonComment,
+            cancellationToken);
+
+        await _ticketRepository.AddStatusChangeAsync(
+            statusChange,
+            cancellationToken);
+
+        await _ticketRepository.SaveChangesAsync(cancellationToken);
+
+        return new ReopenTicketResponse(
+            MapToResponse(ticket),
+            MapToCommentResponse(reasonComment));
+    }
+
+    /// <summary>
     /// Authorizes a viewer and returns one Ticket's status history.
     /// </summary>
     public async Task<IReadOnlyList<TicketStatusChangeResponse>?>
@@ -410,17 +479,27 @@ public sealed class TicketService : ITicketService
                 "requester can confirm closure.");
         }
 
-        bool customerCanChangeStatus =
+        bool supportUserIsReopeningTicket =
+            actorRole is UserRole.Agent or UserRole.Admin &&
             ticket.Status == TicketStatus.Resolved &&
-            request.Status is
-                TicketStatus.InProgress or TicketStatus.Closed;
+            request.Status == TicketStatus.InProgress;
 
-        if (actorRole == UserRole.Customer &&
-            !customerCanChangeStatus)
+        if (supportUserIsReopeningTicket)
         {
             throw new ForbiddenException(
-                "Customers can only reopen or close " +
-                "their own resolved tickets.");
+                "Only the requester can reopen a resolved Ticket.");
+        }
+
+        bool customerCanCloseTicket =
+            ticket.Status == TicketStatus.Resolved &&
+            request.Status == TicketStatus.Closed;
+
+        if (actorRole == UserRole.Customer &&
+            !customerCanCloseTicket)
+        {
+            throw new ForbiddenException(
+                "Customers can close their own resolved tickets. " +
+                "Reopening requires the dedicated reopen endpoint.");
         }
 
         TicketStatus previousStatus = ticket.Status;

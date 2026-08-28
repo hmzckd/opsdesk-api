@@ -290,10 +290,10 @@ public sealed class TicketStatusIntegrationTests
     }
 
     /// <summary>
-    /// Verifies a Customer can reopen and close their own resolved Ticket.
+    /// Verifies a Customer can close their own resolved Ticket.
     /// </summary>
     [Fact]
-    public async Task Customer_should_manage_own_resolved_ticket()
+    public async Task Customer_should_close_own_resolved_ticket()
     {
         using HttpClient client = _factory.CreateClient();
 
@@ -310,27 +310,6 @@ public sealed class TicketStatusIntegrationTests
                 client,
                 ticket.Id,
                 "in_progress")).StatusCode);
-        Assert.Equal(
-            HttpStatusCode.OK,
-            (await ChangeStatusAsync(
-                client,
-                ticket.Id,
-                "resolved")).StatusCode);
-
-        SetBearerToken(client, requester.AccessToken);
-        HttpResponseMessage reopenResponse =
-            await ChangeStatusAsync(
-                client,
-                ticket.Id,
-                "in_progress");
-
-        Assert.Equal(HttpStatusCode.OK, reopenResponse.StatusCode);
-        TicketResponse reopenedTicket =
-            await ReadTicketAsync(reopenResponse);
-        Assert.Equal(TicketStatus.InProgress, reopenedTicket.Status);
-        Assert.Null(reopenedTicket.ResolvedAtUtc);
-
-        SetBearerToken(client, agent.AccessToken);
         Assert.Equal(
             HttpStatusCode.OK,
             (await ChangeStatusAsync(

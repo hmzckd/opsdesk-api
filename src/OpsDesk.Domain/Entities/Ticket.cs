@@ -161,6 +161,47 @@ public sealed class Ticket
     }
 
     /// <summary>
+    /// Reopens a resolved Ticket and creates the requester's public reason.
+    /// </summary>
+    public TicketComment Reopen(
+        Guid requesterId,
+        string? reason,
+        DateTime reopenedAtUtc)
+    {
+        if (requesterId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Requester ID cannot be empty.",
+                nameof(requesterId));
+        }
+
+        if (requesterId != RequesterId)
+        {
+            throw new InvalidOperationException(
+                "Only the Ticket requester can reopen the Ticket.");
+        }
+
+        if (Status != TicketStatus.Resolved)
+        {
+            throw new InvalidOperationException(
+                "Only a resolved Ticket can be reopened.");
+        }
+
+        TicketComment reasonComment = TicketComment.Create(
+            Id,
+            requesterId,
+            reason,
+            reopenedAtUtc);
+
+        Status = TicketStatus.InProgress;
+        UpdatedAtUtc = reopenedAtUtc;
+        ResolvedAtUtc = null;
+        ConcurrencyToken = Guid.NewGuid();
+
+        return reasonComment;
+    }
+
+    /// <summary>
     /// Moves the Ticket to another valid lifecycle status.
     /// </summary>
     public void ChangeStatus(
@@ -192,8 +233,7 @@ public sealed class Ticket
                 (newStatus == TicketStatus.InProgress ||
                     newStatus == TicketStatus.Resolved)) ||
             (Status == TicketStatus.Resolved &&
-                (newStatus == TicketStatus.InProgress ||
-                    newStatus == TicketStatus.Closed));
+                newStatus == TicketStatus.Closed);
 
         if (!isAllowedTransition)
         {

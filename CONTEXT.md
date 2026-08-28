@@ -59,7 +59,7 @@ A solution has been provided and is waiting for requester confirmation.
 The requester has accepted the resolution. The Ticket is final and no longer accepts active handling.
 
 **Reopen**:
-The requester rejects a proposed resolution and returns the Ticket to In Progress.
+The requester rejects a proposed resolution, supplies a required public reason, and returns the Ticket to In Progress. Support Users cannot reopen a resolved Ticket on the requester's behalf.
 _Avoid_: Appeal, dispute
 
 **Ticket Comment**:

@@ -235,6 +235,51 @@ public sealed class TicketsController : ControllerBase
     }
 
     /// <summary>
+    /// Reopens the requester's resolved Ticket with a public reason.
+    /// </summary>
+    [HttpPost("{id:guid}/reopen")]
+    [ProducesResponseType<ReopenTicketResponse>(
+        StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ReopenTicketResponse>> Reopen(
+        Guid id,
+        ReopenTicketRequest request,
+        CancellationToken cancellationToken)
+    {
+        string? userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        string? userRoleClaim =
+            User.FindFirstValue(ClaimTypes.Role);
+
+        if (!Guid.TryParse(userIdClaim, out Guid requesterId) ||
+            !Enum.TryParse(
+                userRoleClaim,
+                ignoreCase: true,
+                out UserRole requesterRole) ||
+            !Enum.IsDefined(requesterRole))
+        {
+            return Unauthorized();
+        }
+
+        ReopenTicketResponse? response =
+            await _ticketService.ReopenAsync(
+                id,
+                requesterId,
+                requesterRole,
+                request,
+                cancellationToken);
+
+        return response is null ? NotFound() : Ok(response);
+    }
+
+    /// <summary>
     /// Retrieves one visible Ticket's chronological status history.
     /// </summary>
     [HttpGet("{id:guid}/status-history")]
