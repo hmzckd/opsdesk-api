@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using OpsDesk.Application.Agents.Interfaces;
+using OpsDesk.Application.Agents.Services;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Auth.Services;
 using OpsDesk.Application.Tickets.Interfaces;
@@ -34,6 +36,7 @@ builder.Services
                 allowIntegerValues: false));
     });
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IAgentService, AgentService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddProblemDetails();

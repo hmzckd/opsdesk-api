@@ -12,6 +12,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 - Password hashing with ASP.NET Core Identity
 - JWT access-token generation and validation
 - `Admin`, `Agent`, and `Customer` roles
+- Admin-only Agent account provisioning with server-owned roles
 - Policy-based authorization and Ticket visibility
 - Ticket creation with server-owned status, requester, and timestamps
 - Ticket detail access for the requester, eligible Agents, and Admins
@@ -78,6 +79,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `POST` | `/auth/register` | Anonymous | Register a customer |
 | `POST` | `/auth/login` | Anonymous | Log in and receive a JWT |
 | `GET` | `/me` | Authenticated | Read the current token identity |
+| `POST` | `/admin/agents` | Admin | Provision an Agent account with validated credentials |
 | `POST` | `/tickets` | Authenticated | Create a Ticket for the current user |
 | `GET` | `/tickets/{id}` | Authenticated and visible | Read one Ticket without leaking protected Tickets |
 | `PUT` | `/tickets/{id}/assignee` | Agent or Admin | Assign a Ticket to an Agent; Agents can only select themselves |
@@ -206,6 +208,7 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - Passwords are hashed and never stored or returned as plain text.
 - JWT secrets and admin seed credentials remain outside source control.
 - Registration always creates a `Customer`; elevated roles cannot be self-selected.
+- Admin Agent provisioning always creates an `Agent`; request payloads cannot select or override the role.
 - Admin seeding creates missing data but never silently promotes an existing user.
 - Named authorization policies keep role rules centralized and reusable.
 - Ticket visibility is decided in the Application layer and enforced by read-only database queries.
