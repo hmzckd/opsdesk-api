@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OpsDesk.Application.Common.Exceptions;
+using OpsDesk.Application.Common.Pagination;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Entities;
@@ -14,6 +15,74 @@ public sealed class TicketRepository : ITicketRepository
     public TicketRepository(OpsDeskDbContext dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    /// <summary>
+    /// Projects one bounded, read-only Ticket page inside the viewer's scope.
+    /// </summary>
+    public async Task<PagedResponse<TicketListItemResponse>>
+        GetVisiblePageAsync(
+            Guid viewerId,
+            UserRole viewerRole,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+    {
+        IQueryable<Ticket> query =
+            _dbContext.Tickets.AsNoTracking();
+
+        query = viewerRole switch
+        {
+            UserRole.Customer => query.Where(
+                ticket => ticket.RequesterId == viewerId),
+            UserRole.Agent => query.Where(
+                ticket =>
+                    ticket.AssigneeId == null ||
+                    ticket.AssigneeId == viewerId),
+            UserRole.Admin => query,
+            _ => query.Where(_ => false)
+        };
+
+        int totalCount = await query.CountAsync(cancellationToken);
+
+        long offset = ((long)page - 1) * pageSize;
+        List<TicketListItemResponse> items;
+
+        if (offset >= totalCount)
+        {
+            items = [];
+        }
+        else
+        {
+            items = await query
+                .OrderByDescending(ticket => ticket.CreatedAtUtc)
+                .ThenByDescending(ticket => ticket.Id)
+                .Skip((int)offset)
+                .Take(pageSize)
+                .Select(ticket => new TicketListItemResponse(
+                    ticket.Id,
+                    ticket.Title,
+                    ticket.Priority,
+                    ticket.Status,
+                    ticket.RequesterId,
+                    ticket.AssigneeId,
+                    ticket.CreatedAtUtc,
+                    ticket.UpdatedAtUtc))
+                .ToListAsync(cancellationToken);
+        }
+
+        int totalPages = totalCount == 0
+            ? 0
+            : (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        return new PagedResponse<TicketListItemResponse>(
+            items,
+            page,
+            pageSize,
+            totalCount,
+            totalPages,
+            HasPreviousPage: totalPages > 0 && page > 1,
+            HasNextPage: page < totalPages);
     }
 
     /// <summary>

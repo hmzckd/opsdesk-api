@@ -1,10 +1,22 @@
+using OpsDesk.Application.Common.Pagination;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Domain.Entities;
+using OpsDesk.Domain.Enums;
 
 namespace OpsDesk.Application.Tickets.Interfaces;
 
 public interface ITicketRepository
 {
+    /// <summary>
+    /// Retrieves one role-scoped, bounded Ticket page.
+    /// </summary>
+    Task<PagedResponse<TicketListItemResponse>> GetVisiblePageAsync(
+        Guid viewerId,
+        UserRole viewerRole,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Retrieves one Ticket's combined timeline in a stable chronological order.
     /// </summary>

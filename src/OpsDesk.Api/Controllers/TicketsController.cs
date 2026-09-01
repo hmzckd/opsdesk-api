@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpsDesk.Application.Authorization;
+using OpsDesk.Application.Common.Pagination;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Enums;
@@ -18,6 +19,44 @@ public sealed class TicketsController : ControllerBase
     public TicketsController(ITicketService ticketService)
     {
         _ticketService = ticketService;
+    }
+
+    /// <summary>
+    /// Lists one page of Tickets visible to the authenticated User.
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType<PagedResponse<TicketListItemResponse>>(
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<
+        ActionResult<PagedResponse<TicketListItemResponse>>> List(
+            [FromQuery] ListTicketsRequest request,
+            CancellationToken cancellationToken)
+    {
+        string? userIdClaim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        string? userRoleClaim =
+            User.FindFirstValue(ClaimTypes.Role);
+
+        if (!Guid.TryParse(userIdClaim, out Guid viewerId) ||
+            !Enum.TryParse(
+                userRoleClaim,
+                ignoreCase: true,
+                out UserRole viewerRole) ||
+            !Enum.IsDefined(viewerRole))
+        {
+            return Unauthorized();
+        }
+
+        PagedResponse<TicketListItemResponse> response =
+            await _ticketService.ListAsync(
+                viewerId,
+                viewerRole,
+                request,
+                cancellationToken);
+
+        return Ok(response);
     }
 
     /// <summary>

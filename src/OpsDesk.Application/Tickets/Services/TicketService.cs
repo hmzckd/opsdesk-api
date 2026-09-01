@@ -1,5 +1,6 @@
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Common.Exceptions;
+using OpsDesk.Application.Common.Pagination;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Entities;
@@ -18,6 +19,25 @@ public sealed class TicketService : ITicketService
     {
         _ticketRepository = ticketRepository;
         _userRepository = userRepository;
+    }
+
+    /// <summary>
+    /// Requests one role-scoped Ticket page from the persistence adapter.
+    /// </summary>
+    public Task<PagedResponse<TicketListItemResponse>> ListAsync(
+        Guid viewerId,
+        UserRole viewerRole,
+        ListTicketsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return _ticketRepository.GetVisiblePageAsync(
+            viewerId,
+            viewerRole,
+            request.Page,
+            request.PageSize,
+            cancellationToken);
     }
 
     /// <summary>

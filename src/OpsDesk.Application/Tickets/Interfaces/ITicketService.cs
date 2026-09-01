@@ -1,3 +1,4 @@
+using OpsDesk.Application.Common.Pagination;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Domain.Enums;
 
@@ -5,6 +6,15 @@ namespace OpsDesk.Application.Tickets.Interfaces;
 
 public interface ITicketService
 {
+    /// <summary>
+    /// Lists only Tickets visible to the authenticated User.
+    /// </summary>
+    Task<PagedResponse<TicketListItemResponse>> ListAsync(
+        Guid viewerId,
+        UserRole viewerRole,
+        ListTicketsRequest request,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Retrieves the role-appropriate combined timeline for a visible Ticket.
     /// </summary>
