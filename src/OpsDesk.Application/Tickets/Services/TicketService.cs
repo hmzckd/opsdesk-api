@@ -1,8 +1,10 @@
+using System.Text.Json;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Application.Common.Pagination;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
+using OpsDesk.Application.Tickets.Queries;
 using OpsDesk.Domain.Entities;
 using OpsDesk.Domain.Enums;
 
@@ -32,12 +34,98 @@ public sealed class TicketService : ITicketService
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (request.AssigneeId.HasValue && request.Unassigned)
+        {
+            throw new ArgumentException(
+                "assigneeId cannot be combined with unassigned=true.",
+                nameof(request.AssigneeId));
+        }
+
+        var query = new TicketListQuery(
+            request.Page,
+            request.PageSize,
+            ParseOptionalSnakeCaseEnum<TicketStatus>(
+                request.Status,
+                nameof(request.Status)),
+            ParseOptionalSnakeCaseEnum<TicketPriority>(
+                request.Priority,
+                nameof(request.Priority)),
+            request.RequesterId,
+            request.AssigneeId,
+            request.Unassigned,
+            ParseRequiredCamelCaseEnum<TicketSortField>(
+                request.SortBy,
+                nameof(request.SortBy)),
+            ParseRequiredCamelCaseEnum<TicketSortDirection>(
+                request.SortDirection,
+                nameof(request.SortDirection)));
+
         return _ticketRepository.GetVisiblePageAsync(
             viewerId,
             viewerRole,
-            request.Page,
-            request.PageSize,
+            query,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Converts one optional snake_case query value into a defined enum.
+    /// </summary>
+    private static TEnum? ParseOptionalSnakeCaseEnum<TEnum>(
+        string? value,
+        string parameterName)
+        where TEnum : struct, Enum
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        foreach (TEnum candidate in Enum.GetValues<TEnum>())
+        {
+            string queryValue =
+                JsonNamingPolicy.SnakeCaseLower.ConvertName(
+                    candidate.ToString());
+
+            if (string.Equals(
+                value,
+                queryValue,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return candidate;
+            }
+        }
+
+        throw new ArgumentException(
+            $"{parameterName} is not supported.",
+            parameterName);
+    }
+
+    /// <summary>
+    /// Converts one required camelCase query value into a defined enum.
+    /// </summary>
+    private static TEnum ParseRequiredCamelCaseEnum<TEnum>(
+        string value,
+        string parameterName)
+        where TEnum : struct, Enum
+    {
+        foreach (TEnum candidate in Enum.GetValues<TEnum>())
+        {
+            string queryValue =
+                JsonNamingPolicy.CamelCase.ConvertName(
+                    candidate.ToString());
+
+            if (string.Equals(
+                value,
+                queryValue,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return candidate;
+            }
+        }
+
+        throw new ArgumentException(
+            $"{parameterName} is not supported.",
+            parameterName);
     }
 
     /// <summary>

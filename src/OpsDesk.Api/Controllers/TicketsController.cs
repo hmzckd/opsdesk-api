@@ -27,6 +27,8 @@ public sealed class TicketsController : ControllerBase
     [HttpGet]
     [ProducesResponseType<PagedResponse<TicketListItemResponse>>(
         StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<
         ActionResult<PagedResponse<TicketListItemResponse>>> List(

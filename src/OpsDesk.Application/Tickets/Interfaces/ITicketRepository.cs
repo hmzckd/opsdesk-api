@@ -1,5 +1,6 @@
 using OpsDesk.Application.Common.Pagination;
 using OpsDesk.Application.Tickets.DTOs;
+using OpsDesk.Application.Tickets.Queries;
 using OpsDesk.Domain.Entities;
 using OpsDesk.Domain.Enums;
 
@@ -13,8 +14,7 @@ public interface ITicketRepository
     Task<PagedResponse<TicketListItemResponse>> GetVisiblePageAsync(
         Guid viewerId,
         UserRole viewerRole,
-        int page,
-        int pageSize,
+        TicketListQuery query,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -3,6 +3,7 @@ using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Application.Common.Pagination;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
+using OpsDesk.Application.Tickets.Queries;
 using OpsDesk.Domain.Entities;
 using OpsDesk.Domain.Enums;
 
@@ -24,8 +25,7 @@ public sealed class TicketRepository : ITicketRepository
         GetVisiblePageAsync(
             Guid viewerId,
             UserRole viewerRole,
-            int page,
-            int pageSize,
+            TicketListQuery listQuery,
             CancellationToken cancellationToken = default)
     {
         IQueryable<Ticket> query =
@@ -43,9 +43,38 @@ public sealed class TicketRepository : ITicketRepository
             _ => query.Where(_ => false)
         };
 
+        if (listQuery.Status is TicketStatus status)
+        {
+            query = query.Where(ticket => ticket.Status == status);
+        }
+
+        if (listQuery.Priority is TicketPriority priority)
+        {
+            query = query.Where(
+                ticket => ticket.Priority == priority);
+        }
+
+        if (listQuery.RequesterId is Guid requesterId)
+        {
+            query = query.Where(
+                ticket => ticket.RequesterId == requesterId);
+        }
+
+        if (listQuery.AssigneeId is Guid assigneeId)
+        {
+            query = query.Where(
+                ticket => ticket.AssigneeId == assigneeId);
+        }
+
+        if (listQuery.Unassigned)
+        {
+            query = query.Where(ticket => ticket.AssigneeId == null);
+        }
+
         int totalCount = await query.CountAsync(cancellationToken);
 
-        long offset = ((long)page - 1) * pageSize;
+        long offset =
+            ((long)listQuery.Page - 1) * listQuery.PageSize;
         List<TicketListItemResponse> items;
 
         if (offset >= totalCount)
@@ -54,11 +83,15 @@ public sealed class TicketRepository : ITicketRepository
         }
         else
         {
-            items = await query
-                .OrderByDescending(ticket => ticket.CreatedAtUtc)
-                .ThenByDescending(ticket => ticket.Id)
+            IOrderedQueryable<Ticket> orderedQuery =
+                ApplyOrdering(
+                    query,
+                    listQuery.SortBy,
+                    listQuery.SortDirection);
+
+            items = await orderedQuery
                 .Skip((int)offset)
-                .Take(pageSize)
+                .Take(listQuery.PageSize)
                 .Select(ticket => new TicketListItemResponse(
                     ticket.Id,
                     ticket.Title,
@@ -73,16 +106,65 @@ public sealed class TicketRepository : ITicketRepository
 
         int totalPages = totalCount == 0
             ? 0
-            : (int)Math.Ceiling(totalCount / (double)pageSize);
+            : (int)Math.Ceiling(
+                totalCount / (double)listQuery.PageSize);
 
         return new PagedResponse<TicketListItemResponse>(
             items,
-            page,
-            pageSize,
+            listQuery.Page,
+            listQuery.PageSize,
             totalCount,
             totalPages,
-            HasPreviousPage: totalPages > 0 && page > 1,
-            HasNextPage: page < totalPages);
+            HasPreviousPage:
+                totalPages > 0 && listQuery.Page > 1,
+            HasNextPage: listQuery.Page < totalPages);
+    }
+
+    /// <summary>
+    /// Applies approved ordering with a deterministic Ticket ID tie-breaker.
+    /// </summary>
+    private static IOrderedQueryable<Ticket> ApplyOrdering(
+        IQueryable<Ticket> query,
+        TicketSortField sortBy,
+        TicketSortDirection sortDirection)
+    {
+        return (sortBy, sortDirection) switch
+        {
+            (TicketSortField.CreatedAtUtc,
+                TicketSortDirection.Asc) => query
+                    .OrderBy(ticket => ticket.CreatedAtUtc)
+                    .ThenBy(ticket => ticket.Id),
+            (TicketSortField.CreatedAtUtc,
+                TicketSortDirection.Desc) => query
+                    .OrderByDescending(ticket => ticket.CreatedAtUtc)
+                    .ThenByDescending(ticket => ticket.Id),
+            (TicketSortField.UpdatedAtUtc,
+                TicketSortDirection.Asc) => query
+                    .OrderBy(ticket => ticket.UpdatedAtUtc)
+                    .ThenBy(ticket => ticket.Id),
+            (TicketSortField.UpdatedAtUtc,
+                TicketSortDirection.Desc) => query
+                    .OrderByDescending(ticket => ticket.UpdatedAtUtc)
+                    .ThenByDescending(ticket => ticket.Id),
+            (TicketSortField.Priority,
+                TicketSortDirection.Asc) => query
+                    .OrderBy(ticket =>
+                        ticket.Priority == TicketPriority.Low ? 0 :
+                        ticket.Priority == TicketPriority.Medium ? 1 :
+                        ticket.Priority == TicketPriority.High ? 2 : 3)
+                    .ThenBy(ticket => ticket.Id),
+            (TicketSortField.Priority,
+                TicketSortDirection.Desc) => query
+                    .OrderByDescending(ticket =>
+                        ticket.Priority == TicketPriority.Low ? 0 :
+                        ticket.Priority == TicketPriority.Medium ? 1 :
+                        ticket.Priority == TicketPriority.High ? 2 : 3)
+                    .ThenByDescending(ticket => ticket.Id),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(sortBy),
+                sortBy,
+                "Ticket sorting is not supported.")
+        };
     }
 
     /// <summary>
