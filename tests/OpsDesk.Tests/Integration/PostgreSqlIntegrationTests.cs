@@ -19,8 +19,11 @@ public sealed class PostgreSqlIntegrationTests
         _factory = fixture.Factory;
     }
 
+    /// <summary>
+    /// Verifies PostgreSQL contains every migration known by the EF Core model.
+    /// </summary>
     [Fact]
-    public async Task Expected_migrations_should_be_applied_to_postgresql()
+    public async Task All_known_migrations_should_be_applied_to_postgresql()
     {
         await using AsyncServiceScope scope =
             _factory.Services.CreateAsyncScope();
@@ -32,28 +35,18 @@ public sealed class PostgreSqlIntegrationTests
             "Npgsql.EntityFrameworkCore.PostgreSQL",
             dbContext.Database.ProviderName);
 
+        string[] knownMigrations =
+            dbContext.Database
+                .GetMigrations()
+            .ToArray();
+
         string[] appliedMigrations =
             (await dbContext.Database
                 .GetAppliedMigrationsAsync())
             .ToArray();
 
-        Assert.Contains(
-            appliedMigrations,
-            migration => migration.EndsWith(
-                "_InitialCreate",
-                StringComparison.Ordinal));
-
-        Assert.Contains(
-            appliedMigrations,
-            migration => migration.EndsWith(
-                "_AddTickets",
-                StringComparison.Ordinal));
-
-        Assert.Contains(
-            appliedMigrations,
-            migration => migration.EndsWith(
-                "_AddTicketStatusChanges",
-                StringComparison.Ordinal));
+        Assert.NotEmpty(knownMigrations);
+        Assert.Equal(knownMigrations, appliedMigrations);
     }
 
     [Fact]

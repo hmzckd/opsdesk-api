@@ -21,6 +21,7 @@ using OpsDesk.Infrastructure.Persistence;
 using OpsDesk.Application.Authorization;
 using OpsDesk.Domain.Enums;
 using Microsoft.Extensions.Options;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -116,6 +117,8 @@ builder.Services.AddSwaggerGen(options =>
                 "Bearer",
                 document)] = []
         });
+
+    options.OperationFilter<TicketListExamplesOperationFilter>();
 });
 
 var app = builder.Build();
@@ -184,3 +187,40 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.Run();
 
 public partial class Program;
+
+internal sealed class TicketListExamplesOperationFilter :
+    IOperationFilter
+{
+    /// <summary>
+    /// Adds practical query examples only to the Ticket collection operation.
+    /// </summary>
+    public void Apply(
+        OpenApiOperation operation,
+        OperationFilterContext context)
+    {
+        bool isTicketListOperation =
+            string.Equals(
+                context.ApiDescription.HttpMethod,
+                HttpMethods.Get,
+                StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(
+                context.ApiDescription.RelativePath,
+                "tickets",
+                StringComparison.OrdinalIgnoreCase);
+
+        if (!isTicketListOperation)
+        {
+            return;
+        }
+
+        operation.Description = """
+            Example queries:
+
+            GET /tickets?page=1&pageSize=20
+
+            GET /tickets?status=open&priority=high
+
+            GET /tickets?unassigned=true
+            """;
+    }
+}

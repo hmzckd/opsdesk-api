@@ -15,8 +15,9 @@ The Ticket attributes themselves are defined in the [V2 Ticket Domain Contract](
 - The authenticated creator always becomes the Requester.
 - V2 does not allow creating a Ticket on behalf of another User.
 - Customers can discover and view only Tickets where they are the Requester.
-- Agents and Admins can discover and view every Ticket so that unassigned work can be found and handled.
-- Assignment does not restrict Agent or Admin visibility.
+- Agents can discover and view unassigned Tickets or Tickets assigned to themselves.
+- Admins can discover and view every Ticket.
+- Assignment restricts Agent visibility but does not restrict Admin visibility.
 - Visibility rules apply consistently to Ticket details and later Ticket comments, status history, and activity views.
 
 ## Role Matrix
@@ -25,7 +26,7 @@ The Ticket attributes themselves are defined in the [V2 Ticket Domain Contract](
 |---|---:|---:|---|---|
 | Anonymous caller | No | No | None | None |
 | Customer | Yes | No | Own Tickets only | Own Tickets only |
-| Agent | Yes | No | All Tickets | All Tickets |
+| Agent | Yes | No | Unassigned or self-assigned Tickets | Unassigned or self-assigned Tickets |
 | Admin | Yes | No | All Tickets | All Tickets |
 
 ## Creation Contract
@@ -51,6 +52,7 @@ Requester profile summaries can be introduced only through a separate approved c
 | Missing or invalid authentication | `401 Unauthorized` | The caller has no valid identity. |
 | Authenticated caller requests a Ticket that does not exist | `404 Not Found` | No resource can be returned. |
 | Customer requests another requester's Ticket | `404 Not Found` | The API must not reveal whether a protected Ticket exists. |
+| Agent requests a Ticket assigned to another Agent | `404 Not Found` | The API must not reveal whether a protected Ticket exists. |
 | Authenticated caller can view the Ticket | `200 OK` | The Ticket is visible to that identity. |
 | Authenticated caller submits invalid creation input | `400 Bad Request` | The request contract is invalid. |
 
@@ -59,7 +61,7 @@ Requester profile summaries can be introduced only through a separate approved c
 ## Enforcement Boundary
 
 - API authentication establishes the caller's identity.
-- Application use cases apply role and requester visibility rules.
+- Application use cases apply role, requester, and assignment visibility rules.
 - Infrastructure queries must support visibility-aware reads and lists.
 - Controllers must not reconstruct Ticket visibility rules independently.
 - Collection queries introduced in V22-D01 must apply the same visibility scope before pagination.
@@ -72,7 +74,8 @@ V2 implementation tasks must cover:
 - Anonymous creation returning `401 Unauthorized`
 - Customer access to an own Ticket
 - Customer access to another requester's Ticket returning `404 Not Found`
-- Agent access to any Ticket
+- Agent access to unassigned and self-assigned Tickets
+- Agent access to another Agent's assigned Ticket returning `404 Not Found`
 - Admin access to any Ticket
 - Unknown Ticket access returning `404 Not Found`
 

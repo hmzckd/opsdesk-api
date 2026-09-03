@@ -22,6 +22,12 @@ jobs:
       - name: Restore
         run: dotnet restore OpsDesk.sln --configfile NuGet.Config
 
+      - name: Restore local tools
+        run: dotnet tool restore
+
+      - name: Slopwatch
+        run: dotnet slopwatch analyze --fail-on warning
+
       - name: Build
         run: dotnet build OpsDesk.sln --configuration Release --no-restore
 

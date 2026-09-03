@@ -90,12 +90,12 @@ public sealed class TicketDetailsIntegrationTests
     }
 
     /// <summary>
-    /// Verifies support roles can retrieve any Ticket.
+    /// Verifies support roles can retrieve an unassigned Ticket.
     /// </summary>
     [Theory]
     [InlineData(UserRole.Agent)]
     [InlineData(UserRole.Admin)]
-    public async Task Support_staff_should_view_any_ticket(
+    public async Task Support_staff_should_view_unassigned_ticket(
         UserRole role)
     {
         using HttpClient client = _factory.CreateClient();

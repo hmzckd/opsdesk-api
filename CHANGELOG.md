@@ -2,6 +2,31 @@
 
 This file records notable OpsDesk API releases.
 
+## 2.2.0 - 2026-09-03
+
+### Added
+
+- Role-aware Ticket collection listing with compact items and pagination metadata.
+- Optional status, priority, requester, assignee, and unassigned Ticket filters.
+- Stable sorting by creation time, update time, or priority in ascending or descending order.
+- Practical Ticket collection query examples in Swagger and the README.
+
+### Changed
+
+- PostgreSQL integration tests now verify that every known EF Core migration is applied.
+- GitHub Actions restores local .NET tools and rejects new Slopwatch findings.
+
+### Validation
+
+- Release build completed with zero warnings and zero errors.
+- All 190 unit and PostgreSQL integration tests passed with no skipped tests.
+- Line coverage: 96.57% (3,465 of 3,588 lines).
+- Branch coverage: 81.19% (315 of 388 branches).
+- EF Core reported no model changes pending a migration.
+- Slopwatch completed with zero findings.
+- Repository diff and tracked-secret checks completed without release blockers.
+- Automated OpenAPI acceptance verified the Ticket collection query examples.
+
 ## 2.1.0 - 2026-08-31
 
 ### Added

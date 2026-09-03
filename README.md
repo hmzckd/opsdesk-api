@@ -81,6 +81,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `GET` | `/me` | Authenticated | Read the current token identity |
 | `POST` | `/admin/agents` | Admin | Provision an Agent account with validated credentials |
 | `POST` | `/tickets` | Authenticated | Create a Ticket for the current user |
+| `GET` | `/tickets` | Authenticated | List visible Tickets with optional paging, filtering, and sorting |
 | `GET` | `/tickets/{id}` | Authenticated and visible | Read one Ticket without leaking protected Tickets |
 | `PUT` | `/tickets/{id}/assignee` | Agent or Admin | Assign a Ticket to an Agent; Agents can only select themselves |
 | `DELETE` | `/tickets/{id}/assignee` | Agent or Admin | Remove the current assignee within the caller's ownership scope |
@@ -93,6 +94,30 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `GET` | `/admin/access` | Admin | Verify the `AdminOnly` policy |
 | `GET` | `/health` | Anonymous | Check API process health |
 | `GET` | `/swagger` | Anonymous | Open interactive API documentation |
+
+## Ticket Collection Query
+
+Every query parameter is optional. Omitted values use page `1`, page size `20`, and newest-created-first sorting.
+
+| Parameter | Accepted values |
+|---|---|
+| `page` | Integer starting at `1` |
+| `pageSize` | Integer from `1` to `100` |
+| `status` | `open`, `in_progress`, `waiting_customer`, `resolved`, `closed` |
+| `priority` | `low`, `medium`, `high`, `urgent` |
+| `requesterId` | User GUID |
+| `assigneeId` | Agent GUID |
+| `unassigned` | `true` to return only unassigned Tickets; `false` applies no filter |
+| `sortBy` | `createdAtUtc`, `updatedAtUtc`, `priority` |
+| `sortDirection` | `asc`, `desc` |
+
+```http
+GET /tickets?page=1&pageSize=20
+GET /tickets?status=open&priority=high
+GET /tickets?unassigned=true&sortBy=priority&sortDirection=desc
+```
+
+The response contains compact Ticket items plus `page`, `pageSize`, `totalCount`, `totalPages`, `hasPreviousPage`, and `hasNextPage` metadata.
 
 ## Ticket Input Contract
 
