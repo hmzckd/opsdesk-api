@@ -119,6 +119,13 @@ GET /tickets?unassigned=true&sortBy=priority&sortDirection=desc
 
 The response contains compact Ticket items plus `page`, `pageSize`, `totalCount`, `totalPages`, `hasPreviousPage`, and `hasNextPage` metadata.
 
+## Email Input Contract
+
+- Email addresses accept at most 320 characters. Surrounding whitespace is trimmed during normalization, while whitespace inside the address is rejected.
+- The domain must contain at least two non-empty labels, such as `company.com`.
+- `admin@opsdesk.local` remains valid for the development admin seed.
+- This validation checks syntax only; it does not query DNS, inspect MX records, or prove mailbox ownership.
+
 ## Ticket Input Contract
 
 - `title` is required and accepts at most 200 characters.

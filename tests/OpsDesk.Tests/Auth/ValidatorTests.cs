@@ -34,7 +34,9 @@ public sealed class ValidatorTests
     [Theory]
     [InlineData("")]
     [InlineData("hamza")]
+    [InlineData("hamza@gmail")]
     [InlineData("hamza @example.com")]
+    [InlineData("hamza@example..com")]
     public void Invalid_email_should_be_rejected(
         string email)
     {
@@ -42,9 +44,12 @@ public sealed class ValidatorTests
             () => _emailValidator.Validate(email));
     }
 
-    [Fact]
-    public void Valid_email_should_be_accepted()
+    [Theory]
+    [InlineData("hamza@gmail.com")]
+    [InlineData("admin@opsdesk.local")]
+    public void Valid_email_should_be_accepted(
+        string email)
     {
-        _emailValidator.Validate("hamza@example.com");
+        _emailValidator.Validate(email);
     }
 }
