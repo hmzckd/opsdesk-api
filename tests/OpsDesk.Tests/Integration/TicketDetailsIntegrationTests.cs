@@ -34,7 +34,7 @@ public sealed class TicketDetailsIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client);
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         TicketResponse createdTicket = await CreateTicketAsync(client);
 
@@ -76,12 +76,12 @@ public sealed class TicketDetailsIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
 
         TicketResponse createdTicket = await CreateTicketAsync(client);
 
         AuthResponse otherCustomer = await RegisterAsync(client);
-        SetBearerToken(client, otherCustomer.AccessToken);
+        _factory.VerifyAccount(otherCustomer.AccessToken);        SetBearerToken(client, otherCustomer.AccessToken);
 
         HttpResponseMessage response =
             await client.GetAsync($"/tickets/{createdTicket.Id}");
@@ -101,13 +101,14 @@ public sealed class TicketDetailsIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
 
         TicketResponse createdTicket = await CreateTicketAsync(client);
 
         AuthResponse supportUser =
             await AuthenticateSupportUserAsync(client, role);
 
+        _factory.VerifyAccount(supportUser.AccessToken);
         SetBearerToken(client, supportUser.AccessToken);
 
         HttpResponseMessage response =
@@ -132,7 +133,7 @@ public sealed class TicketDetailsIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client);
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         HttpResponseMessage response =
             await client.GetAsync($"/tickets/{Guid.NewGuid()}");
@@ -157,7 +158,7 @@ public sealed class TicketDetailsIntegrationTests
     /// <summary>
     /// Registers a unique Customer through the public authentication API.
     /// </summary>
-    private static async Task<AuthResponse> RegisterAsync(
+    private async Task<AuthResponse> RegisterAsync(
         HttpClient client)
     {
         var request = new RegisterRequest(
@@ -182,7 +183,7 @@ public sealed class TicketDetailsIntegrationTests
     /// <summary>
     /// Creates a Ticket through the public Ticket API.
     /// </summary>
-    private static async Task<TicketResponse> CreateTicketAsync(
+    private async Task<TicketResponse> CreateTicketAsync(
         HttpClient client)
     {
         var request = new CreateTicketRequest(
@@ -258,7 +259,7 @@ public sealed class TicketDetailsIntegrationTests
     /// <summary>
     /// Authenticates an existing User through the public API.
     /// </summary>
-    private static async Task<AuthResponse> LoginAsync(
+    private async Task<AuthResponse> LoginAsync(
         HttpClient client,
         string email,
         string password)

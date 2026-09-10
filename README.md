@@ -8,7 +8,9 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Capabilities
 
-- Customer registration and login
+- Environment-controlled Customer registration and password login
+- Email verification, administrator invitations, and password recovery
+- Optional corporate OpenID Connect sign-in with invitation-owned OpsDesk roles
 - Password hashing with ASP.NET Core Identity
 - JWT access-token generation and validation
 - `Admin`, `Agent`, and `Customer` roles
@@ -32,6 +34,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 - Unit, API, and PostgreSQL Testcontainers tests
 - Cobertura coverage reports in GitHub Actions
 - Docker Compose development environment
+- Mailpit email capture and an opt-in Keycloak development profile
 - GitHub Actions build and test workflow
 
 ## Tech Stack
@@ -40,6 +43,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 - Entity Framework Core 10
 - PostgreSQL 16 and Npgsql
 - JWT Bearer authentication
+- OpenID Connect authorization-code flow with PKCE and local Keycloak
 - xUnit and `WebApplicationFactory`
 - Testcontainers for disposable PostgreSQL integration tests
 - Swashbuckle / Swagger UI
@@ -49,7 +53,9 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ```mermaid
 flowchart TB
-    Client["API Client / Swagger UI"] --> Api["OpsDesk.Api<br/>Controllers, authentication, HTTP responses"]
+    Client["API Client / Browser / Swagger UI"] --> Api["OpsDesk.Api<br/>Controllers, authentication, HTTP responses"]
+    Client --> Identity["Corporate OIDC Provider<br/>Local development: Keycloak"]
+    Identity --> Api
     Api --> Application["OpsDesk.Application<br/>Use cases, DTOs, interfaces, authorization decisions"]
     Application --> Domain["OpsDesk.Domain<br/>Entities, enums, business rules"]
 
@@ -57,6 +63,7 @@ flowchart TB
     Infrastructure -. "implements interfaces" .-> Application
     Infrastructure --> Domain
     Infrastructure --> Database[(PostgreSQL)]
+    Infrastructure --> Mail["SMTP provider<br/>Local development: Mailpit"]
 
     Tests["OpsDesk.Tests<br/>xUnit, WebApplicationFactory, Testcontainers"] -. "exercises public API" .-> Api
     Tests -. "temporary database" .-> Database
@@ -76,9 +83,17 @@ tests/OpsDesk.Tests         Unit and API integration tests
 
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `POST` | `/auth/register` | Anonymous | Register a customer |
+| `POST` | `/auth/register` | Anonymous, when enabled | Register a Customer; returns 403 when public registration is disabled |
 | `POST` | `/auth/login` | Anonymous | Log in and receive a JWT |
+| `POST` | `/auth/email-verification/confirm` | Anonymous | Verify ownership with a one-time email token |
+| `POST` | `/auth/email-verification/resend` | Anonymous | Queue another verification email without disclosing account existence |
+| `POST` | `/auth/forgot-password` | Anonymous | Queue a password-recovery email without disclosing account existence |
+| `POST` | `/auth/reset-password` | Anonymous | Replace a local password with a valid one-time reset token |
+| `POST` | `/auth/invitations/accept` | Anonymous | Create a verified account from a valid one-time invitation |
+| `GET` | `/auth/sso/login` | Browser, when enabled | Display the invitation bootstrap form and begin corporate OIDC sign-in |
+| `POST` | `/auth/sso/logout` | Authenticated | Revoke every local JWT and return the separate provider logout URL |
 | `GET` | `/me` | Authenticated | Read the current token identity |
+| `POST` | `/admin/invitations` | Admin | Invite a Customer or Agent without exposing the raw token in the API response |
 | `POST` | `/admin/agents` | Admin | Provision an Agent account with validated credentials |
 | `POST` | `/tickets` | Authenticated | Create a Ticket for the current user |
 | `GET` | `/tickets` | Authenticated | List visible Tickets with optional paging, filtering, and sorting |
@@ -125,6 +140,69 @@ The response contains compact Ticket items plus `page`, `pageSize`, `totalCount`
 - The domain must contain at least two non-empty labels, such as `company.com`.
 - `admin@opsdesk.local` remains valid for the development admin seed.
 - This validation checks syntax only; it does not query DNS, inspect MX records, or prove mailbox ownership.
+
+## Public Registration
+
+`Registration:PublicRegistrationEnabled` defaults to `false`. The committed `appsettings.Development.json` explicitly sets it to `true` for local development. Demo or other non-production environments must opt in; Production cannot enable it.
+
+| Environment and configuration | Behavior |
+| --- | --- |
+| Setting absent | Public registration disabled |
+| Development/demo with `true` | Existing registration and email verification flow |
+| Any environment with `false` | Valid `POST /auth/register` requests return 403 without account creation or verification email |
+| Production with `true` | Startup fails with a configuration error, before database preparation |
+
+For deployment, use the environment variable `Registration__PublicRegistrationEnabled=false` and set the actual host environment to `Production`. Treat ASP.NET Core environment selection as deployment configuration; a server incorrectly labeled Development is not detected as Production automatically. Restart the application after changing this setting. Invalid boolean values fail startup; malformed HTTP bodies can still receive model-validation 400 responses.
+
+The Application service enforces the restriction, not just the Controller or Swagger. Existing login, email confirmation, password recovery, admin invitations/acceptance, and admin Agent provisioning remain available. This switch does not remove existing users, revoke JWTs, disable password login, or configure SSO. The endpoint remains documented in Swagger.
+
+To disable public registration in your local development environment, run from the repository root and restart the API:
+
+```powershell
+dotnet user-secrets set Registration:PublicRegistrationEnabled false --project src/OpsDesk.Api
+```
+
+To remove that local override and use the committed Development setting again:
+
+```powershell
+dotnet user-secrets remove Registration:PublicRegistrationEnabled --project src/OpsDesk.Api
+```
+
+See [AUTH-004 implementation notes](docs/agents/auth-004-registration-policy.md) for method explanations and test evidence. No database migration is required for this feature.
+
+## Corporate SSO
+
+SSO is disabled by default. OpsDesk uses standard OpenID Connect authorization code plus PKCE, while its existing JWT remains the credential used for API calls. On first SSO sign-in, the provider-verified email must match an active OpsDesk administrator invitation. The invitation supplies the local `Customer` or `Agent` role; provider role claims are deliberately ignored. Returning users are identified by the stable provider `issuer + subject` pair, not by email.
+
+Complete the base [Run Locally](#run-locally) database and JWT setup first. Then prepare local-only Keycloak secrets and matching .NET User Secrets from the repository root:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-local-sso.ps1
+```
+
+Start the supporting services. The `sso` profile opts into Keycloak; it is not started by the default Compose command:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.sso.yml --profile sso up -d postgres mailpit keycloak
+```
+
+Run the API on its configured HTTP profile:
+
+```powershell
+dotnet run --project src/OpsDesk.Api --launch-profile http
+```
+
+Local browser flow:
+
+1. As the development Admin, create an invitation for `sso.agent@example.com` through `POST /admin/invitations`.
+2. Open Mailpit at `http://localhost:8025` and copy the invitation code from that email.
+3. Open `http://localhost:5044/auth/sso/login`, enter the invitation code, and continue to Keycloak.
+4. Sign in as `sso.agent@example.com`. Its generated local-development password is stored under `KEYCLOAK_DEMO_USER_PASSWORD` in the ignored `.env` file.
+5. The callback returns the normal OpsDesk `AuthResponse`; use its `accessToken` as the Swagger Bearer token.
+
+`POST /auth/sso/logout` immediately increments the account's server-side session version, so previously issued OpsDesk JWTs stop working. Its `providerLogoutUrl` is a separate browser step that ends the Keycloak/corporate-provider session. Local logout still succeeds if the provider logout endpoint is temporarily unavailable.
+
+Keycloak `start-dev` is only a local test provider. A production deployment must use HTTPS, an exact public origin and redirect URI, an exact corporate email-domain allowlist, and a secret manager for `Sso__ClientSecret`. Configure `Sso__Enabled=true`, `Sso__Authority`, `Sso__ClientId`, `Sso__ClientSecret`, `Sso__PublicOrigin`, and `Sso__AllowedEmailDomains__0`. Never commit provider secrets or reuse the generated local values. See [AUTH-005 browser-flow notes](docs/agents/auth-005-sso-browser-flow.md) for the protocol and method explanations.
 
 ## Ticket Input Contract
 
@@ -239,6 +317,11 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - Domain and Application projects do not depend on EF Core or HTTP concerns.
 - Passwords are hashed and never stored or returned as plain text.
 - JWT secrets and admin seed credentials remain outside source control.
+- Provider client secrets remain outside source control; SSO stays disabled until a complete validated configuration is supplied.
+- OIDC state, nonce, correlation cookies, anti-forgery validation, and PKCE protect the browser handoff.
+- Raw invitation codes never enter the provider redirect URL; only a hash is stored in protected OIDC state.
+- Provider identity proves who signed in, while the OpsDesk invitation remains the authority for the local role.
+- Local JWT revocation and provider browser logout are intentionally separate operations.
 - Registration always creates a `Customer`; elevated roles cannot be self-selected.
 - Admin Agent provisioning always creates an `Agent`; request payloads cannot select or override the role.
 - Admin seeding creates missing data but never silently promotes an existing user.

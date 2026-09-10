@@ -11,6 +11,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.ToTable("users");
 
         builder.HasKey(user => user.Id);
+        builder.Property(user => user.AuthVersion).HasColumnName("auth_version").HasDefaultValue(0);
 
         builder.Property(user => user.Id)
             .HasColumnName("id")
@@ -38,7 +39,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.PasswordHash)
             .HasColumnName("password_hash")
             .HasMaxLength(500)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(user => user.Role)
             .HasColumnName("role")
@@ -50,5 +51,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
+
+        builder.Property(user => user.EmailVerifiedAtUtc)
+            .HasColumnName("email_verified_at_utc")
+            .HasColumnType("timestamp with time zone");
     }
 }

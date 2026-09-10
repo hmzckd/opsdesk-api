@@ -1,0 +1,20 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.3
+    container_name: opsdesk-keycloak
+    profiles: ["sso"]
+    command: start-dev --import-realm --hostname=http://localhost:8180
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?Run scripts/setup-local-sso.ps1}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run scripts/setup-local-sso.ps1}
+      OPSDESK_SSO_CLIENT_SECRET: ${OPSDESK_SSO_CLIENT_SECRET:?Run scripts/setup-local-sso.ps1}
+      KEYCLOAK_DEMO_USER_PASSWORD: ${KEYCLOAK_DEMO_USER_PASSWORD:?Run scripts/setup-local-sso.ps1}
+    ports:
+      - "127.0.0.1:8180:8080"
+    volumes:
+      - ./deploy/keycloak:/opt/keycloak/data/import:ro
+      - opsdesk-keycloak-data:/opt/keycloak/data
+    mem_limit: 1g
+
+volumes:
+  opsdesk-keycloak-data:

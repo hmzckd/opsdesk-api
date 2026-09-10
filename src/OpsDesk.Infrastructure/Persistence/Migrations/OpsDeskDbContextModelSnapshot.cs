@@ -22,6 +22,92 @@ namespace OpsDesk.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("OpsDesk.Domain.Entities.EmailVerificationToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_email_verification_tokens_token_hash");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_email_verification_tokens_user_id");
+
+                    b.ToTable("email_verification_tokens", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_email_verification_tokens_expiry", "expires_at_utc > created_at_utc");
+                        });
+                });
+
+            modelBuilder.Entity("OpsDesk.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ConsumedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at_utc");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("password_reset_tokens", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_password_reset_tokens_expiry", "expires_at_utc > created_at_utc");
+                        });
+                });
+
             modelBuilder.Entity("OpsDesk.Domain.Entities.Ticket", b =>
                 {
                     b.Property<Guid>("Id")
@@ -212,6 +298,12 @@ namespace OpsDesk.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int>("AuthVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("auth_version");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -221,6 +313,10 @@ namespace OpsDesk.Infrastructure.Persistence.Migrations
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)")
                         .HasColumnName("email");
+
+                    b.Property<DateTime?>("EmailVerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("email_verified_at_utc");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -235,7 +331,6 @@ namespace OpsDesk.Infrastructure.Persistence.Migrations
                         .HasColumnName("last_name");
 
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("password_hash");
@@ -253,6 +348,202 @@ namespace OpsDesk.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_users_email");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("OpsDesk.Domain.Entities.UserExternalIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Issuer")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("issuer");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Issuer", "Subject")
+                        .IsUnique()
+                        .HasDatabaseName("ux_user_external_identities_issuer_subject");
+
+                    b.ToTable("user_external_identities", (string)null);
+                });
+
+            modelBuilder.Entity("OpsDesk.Domain.Entities.UserInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at_utc");
+
+                    b.Property<Guid?>("AcceptedUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("accepted_user_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<Guid>("InvitedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invited_by_id");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("role");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcceptedUserId");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("ux_user_invitations_pending_email")
+                        .HasFilter("revoked_at_utc IS NULL AND accepted_at_utc IS NULL");
+
+                    b.HasIndex("InvitedById");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("user_invitations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_user_invitations_expiry", "expires_at_utc > created_at_utc");
+
+                            t.HasCheckConstraint("ck_user_invitations_role", "role IN ('Customer', 'Agent')");
+                        });
+                });
+
+            modelBuilder.Entity("OpsDesk.Infrastructure.Persistence.Entities.EmailVerificationJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTime>("AvailableAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("available_at_utc");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTime>("RequestedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AvailableAtUtc", "Id");
+
+                    b.ToTable("email_verification_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("OpsDesk.Infrastructure.Persistence.Entities.PasswordRecoveryJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTime>("AvailableAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("available_at_utc");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTime>("RequestedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AvailableAtUtc", "Id");
+
+                    b.ToTable("password_recovery_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("OpsDesk.Domain.Entities.EmailVerificationToken", b =>
+                {
+                    b.HasOne("OpsDesk.Domain.Entities.User", null)
+                        .WithOne()
+                        .HasForeignKey("OpsDesk.Domain.Entities.EmailVerificationToken", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_email_verification_tokens_user");
+                });
+
+            modelBuilder.Entity("OpsDesk.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("OpsDesk.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OpsDesk.Domain.Entities.Ticket", b =>
@@ -332,6 +623,29 @@ namespace OpsDesk.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_ticket_status_changes_ticket");
+                });
+
+            modelBuilder.Entity("OpsDesk.Domain.Entities.UserExternalIdentity", b =>
+                {
+                    b.HasOne("OpsDesk.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OpsDesk.Domain.Entities.UserInvitation", b =>
+                {
+                    b.HasOne("OpsDesk.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptedUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("OpsDesk.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("InvitedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

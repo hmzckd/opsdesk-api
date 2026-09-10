@@ -17,6 +17,83 @@ public sealed class AuthIntegrationTests
     }
 
     [Fact]
+    // Registration must deliver a verification token to the registered address.
+    public async Task Register_should_send_verification_email()
+    {
+        using HttpClient client = _factory.CreateClient();
+        string email = CreateEmail();
+
+        await RegisterAsync(client, email);
+
+        var message = Assert.Single(
+            _factory.SentEmails, item => item.RecipientEmail == email);
+        Assert.False(string.IsNullOrWhiteSpace(message.RawToken));
+        Assert.True(message.ExpiresAtUtc > DateTime.UtcNow);
+    }
+
+    [Fact]
+    // A delivered token can verify its account exactly once through HTTP.
+    public async Task Confirmation_should_accept_delivered_token_and_reject_replay()
+    {
+        using HttpClient client = _factory.CreateClient();
+        string email = CreateEmail();
+        await RegisterAsync(client, email);
+        var message = Assert.Single(
+            _factory.SentEmails, item => item.RecipientEmail == email);
+
+        using HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/auth/email-verification/confirm",
+            new { token = message.RawToken });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        using HttpResponseMessage replay = await client.PostAsJsonAsync(
+            "/auth/email-verification/confirm",
+            new { token = message.RawToken });
+        Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+    }
+
+    [Fact]
+    public async Task Resend_should_hide_unknown_accounts_and_respect_cooldown()
+    {
+        using HttpClient client = _factory.CreateClient();
+        string email = CreateEmail();
+        await RegisterAsync(client, email);
+
+        using HttpResponseMessage known = await client.PostAsJsonAsync(
+            "/auth/email-verification/resend", new { email });
+        using HttpResponseMessage unknown = await client.PostAsJsonAsync(
+            "/auth/email-verification/resend", new { email = CreateEmail() });
+
+        Assert.Equal(HttpStatusCode.NoContent, known.StatusCode);
+        Assert.Equal(known.StatusCode, unknown.StatusCode);
+        Assert.Single(_factory.SentEmails, item => item.RecipientEmail == email);
+    }
+
+    [Fact]
+    public async Task Tickets_should_require_verification_and_accept_same_token_after_confirmation()
+    {
+        using HttpClient client = _factory.CreateClient();
+        string email = CreateEmail();
+        AuthResponse account = await RegisterAsync(client, email);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", account.AccessToken);
+
+        using HttpResponseMessage me = await client.GetAsync("/me");
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        using HttpResponseMessage denied = await client.GetAsync("/tickets");
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        var message = Assert.Single(
+            _factory.SentEmails, item => item.RecipientEmail == email);
+        using HttpResponseMessage confirmation = await client.PostAsJsonAsync(
+            "/auth/email-verification/confirm", new { token = message.RawToken });
+        Assert.Equal(HttpStatusCode.NoContent, confirmation.StatusCode);
+        using HttpResponseMessage allowed = await client.GetAsync("/tickets");
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+    }
+
+    [Fact]
     public async Task Register_login_and_me_should_work()
     {
         using HttpClient client = _factory.CreateClient();

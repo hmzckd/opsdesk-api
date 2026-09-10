@@ -36,7 +36,7 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -101,7 +101,7 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         Assert.Equal(
@@ -158,7 +158,7 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         Assert.Equal(
@@ -169,7 +169,7 @@ public sealed class TicketCommentIntegrationTests
 
         AuthResponse supportUser =
             await CreateStaffUserAsync(client, supportRole);
-        SetBearerToken(client, supportUser.AccessToken);
+        _factory.VerifyAccount(supportUser.AccessToken);        SetBearerToken(client, supportUser.AccessToken);
 
         HttpResponseMessage response = await client.GetAsync(
             $"/tickets/{ticket.Id}/comments");
@@ -196,7 +196,7 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         HttpResponseMessage response = await client.GetAsync(
@@ -221,7 +221,7 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse owner = await RegisterCustomerAsync(client);
-        SetBearerToken(client, owner.AccessToken);
+        _factory.VerifyAccount(owner.AccessToken);        SetBearerToken(client, owner.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         Assert.Equal(
@@ -232,7 +232,7 @@ public sealed class TicketCommentIntegrationTests
             .StatusCode);
 
         AuthResponse otherCustomer = await RegisterCustomerAsync(client);
-        SetBearerToken(client, otherCustomer.AccessToken);
+        _factory.VerifyAccount(otherCustomer.AccessToken);        SetBearerToken(client, otherCustomer.AccessToken);
 
         HttpResponseMessage response = await client.GetAsync(
             $"/tickets/{ticket.Id}/comments");
@@ -263,7 +263,7 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         Assert.Equal(
@@ -275,7 +275,7 @@ public sealed class TicketCommentIntegrationTests
 
         AuthResponse agent =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         Assert.Equal(
@@ -291,6 +291,7 @@ public sealed class TicketCommentIntegrationTests
                 ticket.Id,
                 "resolved")).StatusCode);
 
+        _factory.VerifyAccount(requester.AccessToken);
         SetBearerToken(client, requester.AccessToken);
 
         Assert.Equal(
@@ -324,7 +325,7 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         DateTime sharedCreatedAtUtc = DateTime.UtcNow;
@@ -386,7 +387,7 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -406,11 +407,11 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse owner = await RegisterCustomerAsync(client);
-        SetBearerToken(client, owner.AccessToken);
+        _factory.VerifyAccount(owner.AccessToken);        SetBearerToken(client, owner.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse otherCustomer = await RegisterCustomerAsync(client);
-        SetBearerToken(client, otherCustomer.AccessToken);
+        _factory.VerifyAccount(otherCustomer.AccessToken);        SetBearerToken(client, otherCustomer.AccessToken);
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
             $"/tickets/{ticket.Id}/comments",
@@ -432,12 +433,12 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse supportUser =
             await CreateStaffUserAsync(client, supportRole);
-        SetBearerToken(client, supportUser.AccessToken);
+        _factory.VerifyAccount(supportUser.AccessToken);        SetBearerToken(client, supportUser.AccessToken);
 
         if (supportRole == UserRole.Agent)
         {
@@ -471,12 +472,12 @@ public sealed class TicketCommentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         Assert.Equal(
@@ -492,6 +493,7 @@ public sealed class TicketCommentIntegrationTests
                 ticket.Id,
                 "resolved")).StatusCode);
 
+        _factory.VerifyAccount(requester.AccessToken);
         SetBearerToken(client, requester.AccessToken);
         Assert.Equal(
             HttpStatusCode.OK,
@@ -554,7 +556,7 @@ public sealed class TicketCommentIntegrationTests
     /// <summary>
     /// Registers a unique Customer through the public API.
     /// </summary>
-    private static async Task<AuthResponse> RegisterCustomerAsync(
+    private async Task<AuthResponse> RegisterCustomerAsync(
         HttpClient client)
     {
         var request = new RegisterRequest(
@@ -579,7 +581,7 @@ public sealed class TicketCommentIntegrationTests
     /// <summary>
     /// Creates one Ticket through the public API.
     /// </summary>
-    private static async Task<TicketResponse> CreateTicketAsync(
+    private async Task<TicketResponse> CreateTicketAsync(
         HttpClient client)
     {
         HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -659,7 +661,7 @@ public sealed class TicketCommentIntegrationTests
     /// <summary>
     /// Claims a Ticket for the Agent used by a Comment test.
     /// </summary>
-    private static async Task AssignTicketAsync(
+    private async Task AssignTicketAsync(
         HttpClient client,
         Guid ticketId,
         Guid agentId)

@@ -36,11 +36,11 @@ public sealed class TicketActivityIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
 
         HttpResponseMessage assignmentResponse =
             await client.PutAsJsonAsync(
@@ -130,11 +130,11 @@ public sealed class TicketActivityIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
         await ChangeStatusAsync(client, ticket.Id, "in_progress");
         await AddCommentAsync(client, ticket.Id, "Second stable item.");
@@ -216,15 +216,16 @@ public sealed class TicketActivityIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
         await ChangeStatusAsync(client, ticket.Id, "in_progress");
         await AddCommentAsync(client, ticket.Id, "Public progress update.");
 
+        _factory.VerifyAccount(requester.AccessToken);
         SetBearerToken(client, requester.AccessToken);
         TicketActivityResponse[] activity =
             await GetActivityAsync(client, ticket.Id);
@@ -250,11 +251,11 @@ public sealed class TicketActivityIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse owner = await RegisterCustomerAsync(client);
-        SetBearerToken(client, owner.AccessToken);
+        _factory.VerifyAccount(owner.AccessToken);        SetBearerToken(client, owner.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse otherCustomer = await RegisterCustomerAsync(client);
-        SetBearerToken(client, otherCustomer.AccessToken);
+        _factory.VerifyAccount(otherCustomer.AccessToken);        SetBearerToken(client, otherCustomer.AccessToken);
 
         HttpResponseMessage response =
             await client.GetAsync($"/tickets/{ticket.Id}/activity");
@@ -271,15 +272,15 @@ public sealed class TicketActivityIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse ownerAgent = await CreateAgentAsync(client);
-        SetBearerToken(client, ownerAgent.AccessToken);
+        _factory.VerifyAccount(ownerAgent.AccessToken);        SetBearerToken(client, ownerAgent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, ownerAgent.UserId);
 
         AuthResponse otherAgent = await CreateAgentAsync(client);
-        SetBearerToken(client, otherAgent.AccessToken);
+        _factory.VerifyAccount(otherAgent.AccessToken);        SetBearerToken(client, otherAgent.AccessToken);
 
         HttpResponseMessage response =
             await client.GetAsync($"/tickets/{ticket.Id}/activity");
@@ -296,18 +297,18 @@ public sealed class TicketActivityIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
         await ChangeStatusAsync(client, ticket.Id, "in_progress");
         await AddCommentAsync(client, ticket.Id, "Admin-visible update.");
 
         AuthResponse admin =
             await CreateStaffUserAsync(client, UserRole.Admin);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         TicketActivityResponse[] activity =
             await GetActivityAsync(client, ticket.Id);
@@ -333,7 +334,7 @@ public sealed class TicketActivityIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         TicketActivityResponse[] activity =
@@ -351,7 +352,7 @@ public sealed class TicketActivityIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
 
         HttpResponseMessage response =
             await client.GetAsync($"/tickets/{Guid.NewGuid()}/activity");
@@ -376,7 +377,7 @@ public sealed class TicketActivityIntegrationTests
     /// <summary>
     /// Registers a unique Customer through the public API.
     /// </summary>
-    private static async Task<AuthResponse> RegisterCustomerAsync(
+    private async Task<AuthResponse> RegisterCustomerAsync(
         HttpClient client)
     {
         var request = new RegisterRequest(
@@ -401,7 +402,7 @@ public sealed class TicketActivityIntegrationTests
     /// <summary>
     /// Creates an open Ticket through the public API.
     /// </summary>
-    private static async Task<TicketResponse> CreateTicketAsync(
+    private async Task<TicketResponse> CreateTicketAsync(
         HttpClient client)
     {
         var request = new CreateTicketRequest(
@@ -479,7 +480,7 @@ public sealed class TicketActivityIntegrationTests
     /// <summary>
     /// Claims one Ticket for the Agent used by the test.
     /// </summary>
-    private static async Task AssignTicketAsync(
+    private async Task AssignTicketAsync(
         HttpClient client,
         Guid ticketId,
         Guid agentId)
@@ -494,7 +495,7 @@ public sealed class TicketActivityIntegrationTests
     /// <summary>
     /// Performs one required status transition through the public API.
     /// </summary>
-    private static async Task ChangeStatusAsync(
+    private async Task ChangeStatusAsync(
         HttpClient client,
         Guid ticketId,
         string status)
@@ -509,7 +510,7 @@ public sealed class TicketActivityIntegrationTests
     /// <summary>
     /// Adds one required public Comment through the public API.
     /// </summary>
-    private static async Task AddCommentAsync(
+    private async Task AddCommentAsync(
         HttpClient client,
         Guid ticketId,
         string content)
@@ -524,7 +525,7 @@ public sealed class TicketActivityIntegrationTests
     /// <summary>
     /// Reads and deserializes a successful activity response.
     /// </summary>
-    private static async Task<TicketActivityResponse[]> GetActivityAsync(
+    private async Task<TicketActivityResponse[]> GetActivityAsync(
         HttpClient client,
         Guid ticketId)
     {

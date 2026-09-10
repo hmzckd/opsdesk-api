@@ -23,6 +23,8 @@ public sealed class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("register")]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<AuthResponse>> Register(
         RegisterRequest request,
         CancellationToken cancellationToken)

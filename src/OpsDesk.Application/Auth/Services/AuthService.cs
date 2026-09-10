@@ -17,25 +17,37 @@ public sealed class AuthService : IAuthService
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly IPasswordValidator _passwordValidator;
     private readonly IEmailValidator _emailValidator;
+    private readonly IEmailVerificationService _emailVerificationService;
+    private readonly bool _publicRegistrationEnabled;
 
     public AuthService(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
         IJwtTokenGenerator jwtTokenGenerator,
         IPasswordValidator passwordValidator,
-        IEmailValidator emailValidator)
+        IEmailValidator emailValidator,
+        IEmailVerificationService emailVerificationService,
+        RegistrationSettings registrationSettings)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
         _passwordValidator = passwordValidator;
         _emailValidator = emailValidator;
+        _emailVerificationService = emailVerificationService;
+        _publicRegistrationEnabled = registrationSettings.PublicRegistrationEnabled;
     }
 
+    // Rejects disabled self-registration before any account access; otherwise registers and sends verification.
     public async Task<AuthResponse> RegisterAsync(
         RegisterRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (!_publicRegistrationEnabled)
+        {
+            throw new ForbiddenException("Public registration is disabled. Contact an administrator for an invitation.");
+        }
+
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Email);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Password);
@@ -75,6 +87,10 @@ public sealed class AuthService : IAuthService
 
         await _userRepository.AddAsync(user, cancellationToken);
 
+        await _emailVerificationService.IssueAsync(
+            user,
+            cancellationToken);
+
         return CreateAuthResponse(user);
     }
 
@@ -95,7 +111,7 @@ public sealed class AuthService : IAuthService
             normalizedEmail,
             cancellationToken);
 
-        if (user is null ||
+        if (user is null || string.IsNullOrEmpty(user.PasswordHash) ||
             !_passwordHasher.VerifyPassword(
                 request.Password,
                 user.PasswordHash))

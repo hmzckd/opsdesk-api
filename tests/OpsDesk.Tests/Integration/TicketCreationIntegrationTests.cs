@@ -55,6 +55,7 @@ public sealed class TicketCreationIntegrationTests
 
         AuthResponse customer = await RegisterAsync(client);
 
+        _factory.VerifyAccount(customer.AccessToken);
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
                 "Bearer",
@@ -105,6 +106,7 @@ public sealed class TicketCreationIntegrationTests
 
         AuthResponse customer = await RegisterAsync(client);
 
+        _factory.VerifyAccount(customer.AccessToken);
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
                 "Bearer",
@@ -194,6 +196,7 @@ public sealed class TicketCreationIntegrationTests
 
         AuthResponse customer = await RegisterAsync(client);
 
+        _factory.VerifyAccount(customer.AccessToken);
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
                 "Bearer",
@@ -240,6 +243,7 @@ public sealed class TicketCreationIntegrationTests
 
         AuthResponse customer = await RegisterAsync(client);
 
+        _factory.VerifyAccount(customer.AccessToken);
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
                 "Bearer",
@@ -295,6 +299,7 @@ public sealed class TicketCreationIntegrationTests
 
         AuthResponse customer = await RegisterAsync(client);
 
+        _factory.VerifyAccount(customer.AccessToken);
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
                 "Bearer",
@@ -341,6 +346,7 @@ public sealed class TicketCreationIntegrationTests
                 "Only support roles are accepted by this test.")
         };
 
+        _factory.VerifyAccount(staff.AccessToken);
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
                 "Bearer",
@@ -373,7 +379,7 @@ public sealed class TicketCreationIntegrationTests
     /// <summary>
     /// Registers a unique Customer and returns the authentication response.
     /// </summary>
-    private static async Task<AuthResponse> RegisterAsync(
+    private async Task<AuthResponse> RegisterAsync(
         HttpClient client)
     {
         string email =
@@ -441,7 +447,7 @@ public sealed class TicketCreationIntegrationTests
     /// <summary>
     /// Authenticates an existing User and returns the token response.
     /// </summary>
-    private static async Task<AuthResponse> LoginAsync(
+    private async Task<AuthResponse> LoginAsync(
         HttpClient client,
         string email,
         string password)

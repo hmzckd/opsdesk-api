@@ -74,7 +74,10 @@ public sealed class OpenApiIntegrationTests
                             ["Jwt:SecretKey"] =
                                 "TestSecretKeyForOpsDeskApi1234567890!",
                             ["Jwt:ExpirationMinutes"] = "60",
-                            ["AdminSeed:Enabled"] = "false"
+                            ["AdminSeed:Enabled"] = "false",
+                            ["Email:UseSsl"] = "true",
+                            ["Email:VerificationUrl"] =
+                                "https://opsdesk.example.com/auth/email-verification/confirm"
                         });
                 });
         }

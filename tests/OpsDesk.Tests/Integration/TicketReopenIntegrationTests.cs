@@ -36,17 +36,18 @@ public sealed class TicketReopenIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse admin = await LoginAsync(
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
         await ChangeStatusAsync(client, ticket.Id, "in_progress");
         await ChangeStatusAsync(client, ticket.Id, "resolved");
 
+        _factory.VerifyAccount(requester.AccessToken);
         SetBearerToken(client, requester.AccessToken);
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -125,17 +126,18 @@ public sealed class TicketReopenIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse admin = await LoginAsync(
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
         await ChangeStatusAsync(client, ticket.Id, "in_progress");
         await ChangeStatusAsync(client, ticket.Id, "resolved");
 
+        _factory.VerifyAccount(requester.AccessToken);
         SetBearerToken(client, requester.AccessToken);
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
@@ -169,12 +171,12 @@ public sealed class TicketReopenIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse supportUser =
             await CreateStaffUserAsync(client, supportRole);
-        SetBearerToken(client, supportUser.AccessToken);
+        _factory.VerifyAccount(supportUser.AccessToken);        SetBearerToken(client, supportUser.AccessToken);
 
         if (supportRole == UserRole.Agent)
         {
@@ -215,12 +217,12 @@ public sealed class TicketReopenIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse supportUser =
             await CreateStaffUserAsync(client, supportRole);
-        SetBearerToken(client, supportUser.AccessToken);
+        _factory.VerifyAccount(supportUser.AccessToken);        SetBearerToken(client, supportUser.AccessToken);
 
         if (supportRole == UserRole.Agent)
         {
@@ -260,11 +262,11 @@ public sealed class TicketReopenIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse owner = await RegisterCustomerAsync(client);
-        SetBearerToken(client, owner.AccessToken);
+        _factory.VerifyAccount(owner.AccessToken);        SetBearerToken(client, owner.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse otherCustomer = await RegisterCustomerAsync(client);
-        SetBearerToken(client, otherCustomer.AccessToken);
+        _factory.VerifyAccount(otherCustomer.AccessToken);        SetBearerToken(client, otherCustomer.AccessToken);
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
             $"/tickets/{ticket.Id}/reopen",
@@ -282,7 +284,7 @@ public sealed class TicketReopenIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -314,17 +316,18 @@ public sealed class TicketReopenIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse admin = await LoginAsync(
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
         await ChangeStatusAsync(client, ticket.Id, "in_progress");
         await ChangeStatusAsync(client, ticket.Id, "resolved");
 
+        _factory.VerifyAccount(requester.AccessToken);
         SetBearerToken(client, requester.AccessToken);
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -369,14 +372,14 @@ public sealed class TicketReopenIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse admin = await LoginAsync(
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
         await ChangeStatusAsync(client, ticket.Id, "in_progress");
         await ChangeStatusAsync(client, ticket.Id, "resolved");
 
@@ -395,6 +398,7 @@ public sealed class TicketReopenIntegrationTests
                 $"{constraintName} CHECK " +
                 $"(content <> '{rejectedReason}')");
 
+            _factory.VerifyAccount(requester.AccessToken);
             SetBearerToken(client, requester.AccessToken);
 
             HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -437,7 +441,7 @@ public sealed class TicketReopenIntegrationTests
     /// <summary>
     /// Registers a unique Customer through the public API.
     /// </summary>
-    private static async Task<AuthResponse> RegisterCustomerAsync(
+    private async Task<AuthResponse> RegisterCustomerAsync(
         HttpClient client)
     {
         var request = new RegisterRequest(
@@ -462,7 +466,7 @@ public sealed class TicketReopenIntegrationTests
     /// <summary>
     /// Creates an open Ticket through the public API.
     /// </summary>
-    private static async Task<TicketResponse> CreateTicketAsync(
+    private async Task<TicketResponse> CreateTicketAsync(
         HttpClient client)
     {
         var request = new CreateTicketRequest(
@@ -486,7 +490,7 @@ public sealed class TicketReopenIntegrationTests
     /// <summary>
     /// Authenticates an existing User through the public API.
     /// </summary>
-    private static async Task<AuthResponse> LoginAsync(
+    private async Task<AuthResponse> LoginAsync(
         HttpClient client,
         string email,
         string password)
@@ -543,7 +547,7 @@ public sealed class TicketReopenIntegrationTests
     /// <summary>
     /// Claims one Ticket for the Agent used by the test.
     /// </summary>
-    private static async Task AssignTicketAsync(
+    private async Task AssignTicketAsync(
         HttpClient client,
         Guid ticketId,
         Guid agentId)
@@ -572,7 +576,7 @@ public sealed class TicketReopenIntegrationTests
     /// <summary>
     /// Performs one required status transition through the public API.
     /// </summary>
-    private static async Task ChangeStatusAsync(
+    private async Task ChangeStatusAsync(
         HttpClient client,
         Guid ticketId,
         string status)
@@ -587,7 +591,7 @@ public sealed class TicketReopenIntegrationTests
     /// <summary>
     /// Reads the current Ticket state through the public API.
     /// </summary>
-    private static async Task<TicketResponse> GetTicketAsync(
+    private async Task<TicketResponse> GetTicketAsync(
         HttpClient client,
         Guid ticketId)
     {
@@ -604,7 +608,7 @@ public sealed class TicketReopenIntegrationTests
     /// <summary>
     /// Reads the public Ticket conversation through the public API.
     /// </summary>
-    private static async Task<TicketCommentResponse[]> GetCommentsAsync(
+    private async Task<TicketCommentResponse[]> GetCommentsAsync(
         HttpClient client,
         Guid ticketId)
     {
@@ -620,7 +624,7 @@ public sealed class TicketReopenIntegrationTests
     /// <summary>
     /// Reads the Ticket status history through the public API.
     /// </summary>
-    private static async Task<TicketStatusChangeResponse[]>
+    private async Task<TicketStatusChangeResponse[]>
         GetStatusHistoryAsync(
             HttpClient client,
             Guid ticketId)

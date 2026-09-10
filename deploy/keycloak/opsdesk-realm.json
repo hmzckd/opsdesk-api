@@ -1,0 +1,64 @@
+{
+  "realm": "opsdesk",
+  "displayName": "OpsDesk",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 300,
+  "clients": [
+    {
+      "clientId": "opsdesk-api",
+      "name": "OpsDesk API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${OPSDESK_SSO_CLIENT_SECRET}",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5044/signin-oidc"
+      ],
+      "webOrigins": [
+        "http://localhost:5044"
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5044/auth/sso/signed-out"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "sso.agent",
+      "enabled": true,
+      "email": "sso.agent@example.com",
+      "emailVerified": true,
+      "firstName": "SSO",
+      "lastName": "Agent",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KEYCLOAK_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,8 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using OpsDesk.Api.Authorization;
+using OpsDesk.Api.Configuration;
+using OpsDesk.Api.RateLimiting;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -24,6 +28,11 @@ using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddRegistrationConfiguration();
+builder.Services.AddSsoConfiguration();
+
+builder.Services.AddScoped<OpsDesk.Application.Invitations.Interfaces.IInvitationService,
+    OpsDesk.Application.Invitations.Services.InvitationService>();
 
 
 builder.Services.AddHealthChecks();
@@ -37,8 +46,20 @@ builder.Services
                 allowIntegerValues: false));
     });
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<TimeProvider>(
+    TimeProvider.System);
 builder.Services.AddScoped<IAgentService, AgentService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAuthSessionService, AuthSessionService>();
+builder.Services.AddScoped<IExternalSignInService, ExternalSignInService>();
+builder.Services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
+builder.Services.AddScoped<JwtSessionValidationEvents>();
+builder.Services.AddHostedService<OpsDesk.Api.BackgroundServices.PasswordRecoveryWorker>();
+builder.Services.AddHostedService<OpsDesk.Api.BackgroundServices.EmailVerificationWorker>();
+builder.Services.AddPasswordRecoveryRateLimiting();
+builder.Services.AddScoped<
+    IEmailVerificationService,
+    EmailVerificationService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -61,6 +82,7 @@ builder.Services
             JwtSettings jwtSettings = jwtOptions.Value;
 
             options.MapInboundClaims = false;
+            options.EventsType = typeof(JwtSessionValidationEvents);
 
             options.TokenValidationParameters =
                 new TokenValidationParameters
@@ -84,6 +106,10 @@ builder.Services
 builder.Services
     .AddAuthorizationBuilder()
     .AddPolicy(
+        AuthorizationPolicies.VerifiedEmail,
+        policy => policy.RequireAuthenticatedUser()
+            .AddRequirements(new VerifiedEmailRequirement()))
+    .AddPolicy(
         AuthorizationPolicies.AdminOnly,
         policy => policy.RequireRole(
             UserRole.Admin.ToString()))
@@ -92,6 +118,8 @@ builder.Services
         policy => policy.RequireRole(
             UserRole.Admin.ToString(),
             UserRole.Agent.ToString()));
+
+builder.Services.AddScoped<IAuthorizationHandler, VerifiedEmailHandler>();
 
 builder.Services.AddSwaggerGen(options =>
 {
@@ -122,6 +150,10 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Validate registration before startup database preparation, not only when the first request arrives.
+_ = app.Services.GetRequiredService<IOptions<OpsDesk.Application.Auth.Models.RegistrationSettings>>().Value;
+_ = app.Services.GetRequiredService<IOptions<SsoSettings>>().Value;
 
 using (IServiceScope scope = app.Services.CreateScope())
 {
@@ -155,6 +187,8 @@ app.UseSwaggerUI(options =>
     options.EnablePersistAuthorization();
 });
 
+app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

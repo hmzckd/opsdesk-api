@@ -38,12 +38,12 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
 
         HttpResponseMessage response = await client.PutAsJsonAsync(
             $"/tickets/{ticket.Id}/assignee",
@@ -90,14 +90,14 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse actor =
             await CreateStaffUserAsync(client, UserRole.Agent);
         AuthResponse target =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, actor.AccessToken);
+        _factory.VerifyAccount(actor.AccessToken);        SetBearerToken(client, actor.AccessToken);
 
         HttpResponseMessage response = await client.PutAsJsonAsync(
             $"/tickets/{ticket.Id}/assignee",
@@ -130,12 +130,12 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse owner =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, owner.AccessToken);
+        _factory.VerifyAccount(owner.AccessToken);        SetBearerToken(client, owner.AccessToken);
 
         HttpResponseMessage assignResponse =
             await client.PutAsJsonAsync(
@@ -146,7 +146,7 @@ public sealed class TicketAssignmentIntegrationTests
 
         AuthResponse observer =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, observer.AccessToken);
+        _factory.VerifyAccount(observer.AccessToken);        SetBearerToken(client, observer.AccessToken);
 
         HttpResponseMessage detailsResponse =
             await client.GetAsync($"/tickets/{ticket.Id}");
@@ -219,12 +219,12 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
 
         HttpResponseMessage detailsBeforeAssignment =
             await client.GetAsync($"/tickets/{ticket.Id}");
@@ -282,7 +282,7 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse firstAgent =
@@ -291,7 +291,7 @@ public sealed class TicketAssignmentIntegrationTests
             await CreateStaffUserAsync(client, UserRole.Agent);
         AuthResponse admin =
             await CreateStaffUserAsync(client, UserRole.Admin);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         HttpResponseMessage firstAssignment =
             await client.PutAsJsonAsync(
@@ -360,12 +360,12 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse admin =
             await CreateStaffUserAsync(client, UserRole.Admin);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         HttpResponseMessage missingUserResponse =
             await client.PutAsJsonAsync(
@@ -408,12 +408,12 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
 
         HttpResponseMessage assignmentResponse =
             await client.PutAsJsonAsync(
@@ -440,12 +440,12 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
 
         HttpResponseMessage firstAssignment =
             await client.PutAsJsonAsync(
@@ -511,14 +511,14 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse assignedAgent =
             await CreateStaffUserAsync(client, UserRole.Agent);
         AuthResponse replacementAgent =
             await CreateStaffUserAsync(client, UserRole.Agent);
-        SetBearerToken(client, assignedAgent.AccessToken);
+        _factory.VerifyAccount(assignedAgent.AccessToken);        SetBearerToken(client, assignedAgent.AccessToken);
 
         HttpResponseMessage assignmentResponse =
             await client.PutAsJsonAsync(
@@ -537,6 +537,7 @@ public sealed class TicketAssignmentIntegrationTests
         Assert.Equal(HttpStatusCode.OK, startResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, resolveResponse.StatusCode);
 
+        _factory.VerifyAccount(requester.AccessToken);
         SetBearerToken(client, requester.AccessToken);
         HttpResponseMessage closeResponse =
             await client.PatchAsJsonAsync(
@@ -547,7 +548,7 @@ public sealed class TicketAssignmentIntegrationTests
 
         AuthResponse admin =
             await CreateStaffUserAsync(client, UserRole.Admin);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         HttpResponseMessage reassignResponse =
             await client.PutAsJsonAsync(
@@ -590,7 +591,7 @@ public sealed class TicketAssignmentIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticketResponse = await CreateTicketAsync(client);
 
         AuthResponse firstAgent =
@@ -679,7 +680,7 @@ public sealed class TicketAssignmentIntegrationTests
     /// <summary>
     /// Registers a unique Customer through the public API.
     /// </summary>
-    private static async Task<AuthResponse> RegisterCustomerAsync(
+    private async Task<AuthResponse> RegisterCustomerAsync(
         HttpClient client)
     {
         var request = new RegisterRequest(
@@ -704,7 +705,7 @@ public sealed class TicketAssignmentIntegrationTests
     /// <summary>
     /// Creates one Ticket through the public API.
     /// </summary>
-    private static async Task<TicketResponse> CreateTicketAsync(
+    private async Task<TicketResponse> CreateTicketAsync(
         HttpClient client)
     {
         HttpResponseMessage response = await client.PostAsJsonAsync(

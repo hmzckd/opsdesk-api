@@ -12,6 +12,24 @@ public sealed class UserRepository : IUserRepository
 {
     private readonly OpsDeskDbContext _dbContext;
 
+    // Projects one scalar for JWT validation without loading the account's password hash.
+    public Task<int?> GetAuthVersionAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Users.Where(user => user.Id == userId)
+            .Select(user => (int?)user.AuthVersion).SingleOrDefaultAsync(cancellationToken);
+    }
+
+    // Uses one SQL update so concurrent logout/reset operations cannot overwrite each other.
+    public async Task<bool> RevokeSessionsAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+    {
+        int affectedRows = await _dbContext.Users
+            .Where(user => user.Id == userId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(user => user.AuthVersion, user => user.AuthVersion + 1), cancellationToken);
+        return affectedRows == 1;
+    }
+
     public UserRepository(OpsDeskDbContext dbContext)
     {
         _dbContext = dbContext;
@@ -49,6 +67,18 @@ public sealed class UserRepository : IUserRepository
             .SingleOrDefaultAsync(
                 user => user.Id == userId,
                 cancellationToken);
+    }
+
+    /// <summary>
+    /// Retrieves one User with EF tracking so its state can be persisted.
+    /// </summary>
+    public Task<User?> GetByIdForUpdateAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Users.SingleOrDefaultAsync(
+            user => user.Id == userId,
+            cancellationToken);
     }
 
     public async Task AddAsync(

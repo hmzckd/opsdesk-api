@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
+using OpsDesk.Application.Authorization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -40,6 +42,7 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
                     .ToString(),
                 ClaimValueTypes.Integer64),
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(AuthClaimTypes.AuthVersion, user.AuthVersion.ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Integer32),
             new(
                 ClaimTypes.Name,
                 $"{user.FirstName} {user.LastName}".Trim()),

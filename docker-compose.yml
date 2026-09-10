@@ -8,10 +8,14 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=opsdesk;Username=opsdesk;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       Jwt__SecretKey: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      Email__Host: mailpit
+      Email__VerificationUrl: http://localhost:8080/auth/email-verification/confirm
     ports:
       - "8080:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
 
   postgres:
@@ -30,6 +34,19 @@ services:
       retries: 10
     volumes:
       - opsdesk-postgres-data:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit:v1.30.0
+    container_name: opsdesk-mailpit
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
 volumes:
   opsdesk-postgres-data:

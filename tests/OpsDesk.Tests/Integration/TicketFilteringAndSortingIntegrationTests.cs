@@ -32,7 +32,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "StatusFilter");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         await CreateTicketAsync(client, "Ticket remaining open");
         TicketResponse inProgressTicket = await CreateTicketAsync(
@@ -44,6 +44,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
 
+        _factory.VerifyAccount(admin.AccessToken);
         SetBearerToken(client, admin.AccessToken);
         AgentCredentials agent = await CreateAgentAsync(client);
         await AssignTicketAsync(client, inProgressTicket.Id, agent.Id);
@@ -53,12 +54,14 @@ public sealed class TicketFilteringAndSortingIntegrationTests
             agent.Email,
             agent.Password);
 
+        _factory.VerifyAccount(authenticatedAgent.AccessToken);
         SetBearerToken(client, authenticatedAgent.AccessToken);
         await ChangeStatusAsync(
             client,
             inProgressTicket.Id,
             "in_progress");
 
+        _factory.VerifyAccount(customer.AccessToken);
         SetBearerToken(client, customer.AccessToken);
 
         HttpResponseMessage response =
@@ -83,7 +86,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "PriorityFilter");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         await CreateTicketAsync(client, "Low-priority ticket", "low");
         TicketResponse highPriorityTicket = await CreateTicketAsync(
@@ -115,7 +118,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         AuthResponse firstCustomer = await RegisterAsync(
             client,
             "FirstRequester");
-        SetBearerToken(client, firstCustomer.AccessToken);
+        _factory.VerifyAccount(firstCustomer.AccessToken);        SetBearerToken(client, firstCustomer.AccessToken);
         TicketResponse firstTicket = await CreateTicketAsync(
             client,
             "First requester's ticket");
@@ -123,7 +126,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         AuthResponse secondCustomer = await RegisterAsync(
             client,
             "SecondRequester");
-        SetBearerToken(client, secondCustomer.AccessToken);
+        _factory.VerifyAccount(secondCustomer.AccessToken);        SetBearerToken(client, secondCustomer.AccessToken);
         TicketResponse secondTicket = await CreateTicketAsync(
             client,
             "Second requester's ticket");
@@ -132,7 +135,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         HttpResponseMessage response = await client.GetAsync(
             $"/tickets?requesterId={firstCustomer.UserId}");
@@ -158,7 +161,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "AssigneeFilter");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
         TicketResponse firstTicket = await CreateTicketAsync(
             client,
             "First assigned ticket");
@@ -170,7 +173,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         AgentCredentials firstAgent = await CreateAgentAsync(client);
         AgentCredentials secondAgent = await CreateAgentAsync(client);
@@ -198,7 +201,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "UnassignedFilter");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
         TicketResponse unassignedTicket = await CreateTicketAsync(
             client,
             "Unassigned filtered ticket");
@@ -210,7 +213,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         AgentCredentials agent = await CreateAgentAsync(client);
         await AssignTicketAsync(client, assignedTicket.Id, agent.Id);
@@ -236,7 +239,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "CombinedFilter");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
         await CreateTicketAsync(client, "Combined low ticket", "low");
         TicketResponse matchingTicket = await CreateTicketAsync(
             client,
@@ -247,7 +250,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         string query =
             $"/tickets?requesterId={customer.UserId}" +
@@ -274,15 +277,16 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         AuthResponse firstCustomer = await RegisterAsync(
             client,
             "VisibleRequester");
-        SetBearerToken(client, firstCustomer.AccessToken);
+        _factory.VerifyAccount(firstCustomer.AccessToken);        SetBearerToken(client, firstCustomer.AccessToken);
         await CreateTicketAsync(client, "Visible own ticket");
 
         AuthResponse secondCustomer = await RegisterAsync(
             client,
             "HiddenRequester");
-        SetBearerToken(client, secondCustomer.AccessToken);
+        _factory.VerifyAccount(secondCustomer.AccessToken);        SetBearerToken(client, secondCustomer.AccessToken);
         await CreateTicketAsync(client, "Hidden other ticket");
 
+        _factory.VerifyAccount(firstCustomer.AccessToken);
         SetBearerToken(client, firstCustomer.AccessToken);
 
         HttpResponseMessage response = await client.GetAsync(
@@ -305,7 +309,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "CreatedSort");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         TicketResponse oldestTicket = await CreateTicketAsync(
             client,
@@ -338,7 +342,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "UpdatedSort");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         TicketResponse firstTicket = await CreateTicketAsync(
             client,
@@ -370,7 +374,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "PrioritySortAsc");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         TicketResponse urgentTicket = await CreateTicketAsync(
             client,
@@ -410,7 +414,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "PrioritySortDesc");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         TicketResponse mediumTicket = await CreateTicketAsync(
             client,
@@ -450,7 +454,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "StablePaging");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         for (int index = 1; index <= 5; index++)
         {
@@ -497,7 +501,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         HttpResponseMessage response = await client.GetAsync(
             $"/tickets?assigneeId={Guid.NewGuid()}&unassigned=true");
@@ -527,7 +531,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse customer = await RegisterAsync(client, "InvalidQuery");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         HttpResponseMessage response = await client.GetAsync(
             $"/tickets?{query}");
@@ -550,7 +554,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
             client,
             OpsDeskApiFactory.AdminEmail,
             OpsDeskApiFactory.AdminPassword);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         TicketListEnvelope result = await GetListAsync(
             client,
@@ -571,7 +575,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
         AuthResponse customer = await RegisterAsync(
             client,
             "UnassignedFalse");
-        SetBearerToken(client, customer.AccessToken);
+        _factory.VerifyAccount(customer.AccessToken);        SetBearerToken(client, customer.AccessToken);
 
         await CreateTicketAsync(client, "First unfiltered ticket");
         await CreateTicketAsync(client, "Second unfiltered ticket");
@@ -587,7 +591,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
     /// <summary>
     /// Registers a unique Customer through the public authentication API.
     /// </summary>
-    private static async Task<AuthResponse> RegisterAsync(
+    private async Task<AuthResponse> RegisterAsync(
         HttpClient client,
         string lastName)
     {
@@ -613,7 +617,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
     /// <summary>
     /// Authenticates an existing User through the public API.
     /// </summary>
-    private static async Task<AuthResponse> LoginAsync(
+    private async Task<AuthResponse> LoginAsync(
         HttpClient client,
         string email,
         string password)
@@ -636,7 +640,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
     /// <summary>
     /// Creates a Ticket through the public Ticket API.
     /// </summary>
-    private static async Task<TicketResponse> CreateTicketAsync(
+    private async Task<TicketResponse> CreateTicketAsync(
         HttpClient client,
         string title,
         string? priority = null)
@@ -665,7 +669,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
     /// <summary>
     /// Provisions an Agent through the public Admin endpoint.
     /// </summary>
-    private static async Task<AgentCredentials> CreateAgentAsync(
+    private async Task<AgentCredentials> CreateAgentAsync(
         HttpClient client)
     {
         const string password = "AgentPass!";
@@ -693,7 +697,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
     /// <summary>
     /// Assigns one Ticket through the public assignment endpoint.
     /// </summary>
-    private static async Task AssignTicketAsync(
+    private async Task AssignTicketAsync(
         HttpClient client,
         Guid ticketId,
         Guid assigneeId)
@@ -709,7 +713,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
     /// <summary>
     /// Changes one Ticket status through the public lifecycle endpoint.
     /// </summary>
-    private static async Task ChangeStatusAsync(
+    private async Task ChangeStatusAsync(
         HttpClient client,
         Guid ticketId,
         string status)
@@ -725,7 +729,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
     /// <summary>
     /// Adds a public Comment so the Ticket receives a newer update timestamp.
     /// </summary>
-    private static async Task AddCommentAsync(
+    private async Task AddCommentAsync(
         HttpClient client,
         Guid ticketId)
     {
@@ -739,7 +743,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
     /// <summary>
     /// Reads one required Ticket collection response.
     /// </summary>
-    private static async Task<TicketListEnvelope> ReadListAsync(
+    private async Task<TicketListEnvelope> ReadListAsync(
         HttpResponseMessage response)
     {
         TicketListEnvelope? result =
@@ -753,7 +757,7 @@ public sealed class TicketFilteringAndSortingIntegrationTests
     /// <summary>
     /// Executes a successful Ticket-list request and reads its response body.
     /// </summary>
-    private static async Task<TicketListEnvelope> GetListAsync(
+    private async Task<TicketListEnvelope> GetListAsync(
         HttpClient client,
         string requestUri)
     {

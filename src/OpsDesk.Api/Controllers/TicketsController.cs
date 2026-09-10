@@ -10,7 +10,7 @@ using OpsDesk.Domain.Enums;
 namespace OpsDesk.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = AuthorizationPolicies.VerifiedEmail)]
 [Route("tickets")]
 public sealed class TicketsController : ControllerBase
 {

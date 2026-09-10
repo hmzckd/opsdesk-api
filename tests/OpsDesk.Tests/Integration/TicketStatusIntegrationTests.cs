@@ -36,12 +36,12 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
 
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         var request = new
@@ -75,12 +75,12 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
 
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         HttpResponseMessage response =
@@ -122,11 +122,11 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         Assert.Equal(
@@ -148,6 +148,7 @@ public sealed class TicketStatusIntegrationTests
                 ticket.Id,
                 "in_progress")).StatusCode);
 
+        _factory.VerifyAccount(requester.AccessToken);
         SetBearerToken(client, requester.AccessToken);
         HttpResponseMessage response = await client.GetAsync(
             $"/tickets/{ticket.Id}/status-history");
@@ -202,11 +203,11 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse owner = await RegisterCustomerAsync(client);
-        SetBearerToken(client, owner.AccessToken);
+        _factory.VerifyAccount(owner.AccessToken);        SetBearerToken(client, owner.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse otherCustomer = await RegisterCustomerAsync(client);
-        SetBearerToken(client, otherCustomer.AccessToken);
+        _factory.VerifyAccount(otherCustomer.AccessToken);        SetBearerToken(client, otherCustomer.AccessToken);
 
         HttpResponseMessage response = await client.GetAsync(
             $"/tickets/{ticket.Id}/status-history");
@@ -223,11 +224,11 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         HttpResponseMessage response =
@@ -263,7 +264,7 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         HttpResponseMessage response =
@@ -298,11 +299,11 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
         Assert.Equal(
             HttpStatusCode.OK,
@@ -317,6 +318,7 @@ public sealed class TicketStatusIntegrationTests
                 ticket.Id,
                 "resolved")).StatusCode);
 
+        _factory.VerifyAccount(requester.AccessToken);
         SetBearerToken(client, requester.AccessToken);
         HttpResponseMessage closeResponse =
             await ChangeStatusAsync(client, ticket.Id, "closed");
@@ -340,12 +342,12 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse supportUser =
             await CreateStaffUserAsync(client, supportRole);
-        SetBearerToken(client, supportUser.AccessToken);
+        _factory.VerifyAccount(supportUser.AccessToken);        SetBearerToken(client, supportUser.AccessToken);
 
         if (supportRole == UserRole.Agent)
         {
@@ -400,11 +402,11 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse owner = await RegisterCustomerAsync(client);
-        SetBearerToken(client, owner.AccessToken);
+        _factory.VerifyAccount(owner.AccessToken);        SetBearerToken(client, owner.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse otherCustomer = await RegisterCustomerAsync(client);
-        SetBearerToken(client, otherCustomer.AccessToken);
+        _factory.VerifyAccount(otherCustomer.AccessToken);        SetBearerToken(client, otherCustomer.AccessToken);
 
         HttpResponseMessage response =
             await ChangeStatusAsync(
@@ -441,7 +443,7 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
 
         HttpResponseMessage response =
             await ChangeStatusAsync(
@@ -461,7 +463,7 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
 
         HttpResponseMessage response =
             await ChangeStatusAsync(
@@ -481,11 +483,11 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
         Assert.Equal(
             HttpStatusCode.OK,
@@ -512,11 +514,11 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse agent = await CreateAgentAsync(client);
-        SetBearerToken(client, agent.AccessToken);
+        _factory.VerifyAccount(agent.AccessToken);        SetBearerToken(client, agent.AccessToken);
         await AssignTicketAsync(client, ticket.Id, agent.UserId);
 
         string[] statuses =
@@ -562,12 +564,12 @@ public sealed class TicketStatusIntegrationTests
         using HttpClient client = _factory.CreateClient();
 
         AuthResponse requester = await RegisterCustomerAsync(client);
-        SetBearerToken(client, requester.AccessToken);
+        _factory.VerifyAccount(requester.AccessToken);        SetBearerToken(client, requester.AccessToken);
         TicketResponse ticket = await CreateTicketAsync(client);
 
         AuthResponse admin =
             await CreateStaffUserAsync(client, UserRole.Admin);
-        SetBearerToken(client, admin.AccessToken);
+        _factory.VerifyAccount(admin.AccessToken);        SetBearerToken(client, admin.AccessToken);
 
         HttpResponseMessage response =
             await ChangeStatusAsync(
@@ -581,7 +583,7 @@ public sealed class TicketStatusIntegrationTests
     /// <summary>
     /// Registers a unique Customer through the public API.
     /// </summary>
-    private static async Task<AuthResponse> RegisterCustomerAsync(
+    private async Task<AuthResponse> RegisterCustomerAsync(
         HttpClient client)
     {
         var request = new RegisterRequest(
@@ -606,7 +608,7 @@ public sealed class TicketStatusIntegrationTests
     /// <summary>
     /// Creates an open Ticket through the public API.
     /// </summary>
-    private static async Task<TicketResponse> CreateTicketAsync(
+    private async Task<TicketResponse> CreateTicketAsync(
         HttpClient client)
     {
         var request = new CreateTicketRequest(
@@ -643,7 +645,7 @@ public sealed class TicketStatusIntegrationTests
     /// <summary>
     /// Claims a Ticket for the Agent used by a lifecycle test.
     /// </summary>
-    private static async Task AssignTicketAsync(
+    private async Task AssignTicketAsync(
         HttpClient client,
         Guid ticketId,
         Guid agentId)
@@ -658,7 +660,7 @@ public sealed class TicketStatusIntegrationTests
     /// <summary>
     /// Reads a required Ticket response with the API's enum format.
     /// </summary>
-    private static async Task<TicketResponse> ReadTicketAsync(
+    private async Task<TicketResponse> ReadTicketAsync(
         HttpResponseMessage response)
     {
         TicketResponse? ticket =
@@ -716,7 +718,7 @@ public sealed class TicketStatusIntegrationTests
     /// <summary>
     /// Authenticates an existing User through the public API.
     /// </summary>
-    private static async Task<AuthResponse> LoginAsync(
+    private async Task<AuthResponse> LoginAsync(
         HttpClient client,
         string email,
         string password)
