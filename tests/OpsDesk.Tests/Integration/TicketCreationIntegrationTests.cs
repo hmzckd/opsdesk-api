@@ -94,6 +94,10 @@ public sealed class TicketCreationIntegrationTests
         Assert.Equal(customer.UserId, ticket.RequesterId);
         Assert.Null(ticket.AssigneeId);
         Assert.Equal(ticket.CreatedAtUtc, ticket.UpdatedAtUtc);
+        Assert.Equal(
+            ticket.CreatedAtUtc.AddDays(4),
+            ticket.SlaDeadlineUtc);
+        Assert.False(ticket.IsSlaBreached);
     }
 
     /// <summary>

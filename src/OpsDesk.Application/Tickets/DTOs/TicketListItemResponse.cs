@@ -13,4 +13,6 @@ public sealed record TicketListItemResponse(
     Guid RequesterId,
     Guid? AssigneeId,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    DateTime SlaDeadlineUtc,
+    bool IsSlaBreached);

@@ -15,6 +15,7 @@ public interface ITicketRepository
         Guid viewerId,
         UserRole viewerRole,
         TicketListQuery query,
+        DateTime observedAtUtc,
         CancellationToken cancellationToken = default);
 
     /// <summary>

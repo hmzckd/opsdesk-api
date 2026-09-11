@@ -13,7 +13,7 @@ public sealed class TicketTests
     {
         Guid requesterId = Guid.NewGuid();
 
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             requesterId,
             "  Printer is unavailable  ",
             "  The printer does not respond.  ");
@@ -41,7 +41,7 @@ public sealed class TicketTests
     public void Create_should_reject_undefined_priority()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            Ticket.Create(
+            TicketTestFactory.Create(
                 Guid.NewGuid(),
                 "Printer is unavailable",
                 "The printer does not respond.",
@@ -54,7 +54,7 @@ public sealed class TicketTests
     [Fact]
     public void Assign_should_set_assignee_and_update_ticket_version()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -79,7 +79,7 @@ public sealed class TicketTests
     [Fact]
     public void Assign_should_reject_empty_assignee_id()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -96,7 +96,7 @@ public sealed class TicketTests
     [Fact]
     public void Assign_should_not_change_ticket_for_same_assignee()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -126,7 +126,7 @@ public sealed class TicketTests
     [Fact]
     public void Unassign_should_clear_assignee_and_update_ticket_version()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -156,7 +156,7 @@ public sealed class TicketTests
     [Fact]
     public void Unassign_should_not_change_unassigned_ticket()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -181,7 +181,7 @@ public sealed class TicketTests
     [Fact]
     public void Assignment_changes_should_reject_non_utc_time()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -208,7 +208,7 @@ public sealed class TicketTests
     [Fact]
     public void Assignment_changes_should_reject_closed_ticket()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -248,7 +248,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_start_work_on_open_ticket()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -275,7 +275,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_wait_for_customer_from_active_work()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -304,7 +304,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_resume_work_after_customer_reply()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -332,7 +332,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_resolve_active_work()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -357,7 +357,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_resolve_while_waiting_for_customer()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -383,7 +383,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_reject_resolved_to_in_progress()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -419,7 +419,7 @@ public sealed class TicketTests
     public void Reopen_should_change_status_and_create_reason_comment()
     {
         Guid requesterId = Guid.NewGuid();
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             requesterId,
             "Printer is unavailable",
             "The printer does not respond.");
@@ -461,7 +461,7 @@ public sealed class TicketTests
     public void Reopen_should_reject_non_requester_without_mutating_ticket()
     {
         Guid requesterId = Guid.NewGuid();
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             requesterId,
             "Printer is unavailable",
             "The printer does not respond.");
@@ -495,7 +495,7 @@ public sealed class TicketTests
     public void Reopen_should_reject_non_resolved_ticket()
     {
         Guid requesterId = Guid.NewGuid();
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             requesterId,
             "Printer is unavailable",
             "The printer does not respond.");
@@ -521,7 +521,7 @@ public sealed class TicketTests
     public void Reopen_should_reject_invalid_reason_without_mutating_ticket()
     {
         Guid requesterId = Guid.NewGuid();
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             requesterId,
             "Printer is unavailable",
             "The printer does not respond.");
@@ -554,7 +554,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_close_resolved_ticket()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -583,7 +583,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_reject_non_utc_time()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -611,7 +611,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_reject_undefined_status()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -628,7 +628,7 @@ public sealed class TicketTests
     [Fact]
     public void ChangeStatus_should_keep_closed_ticket_terminal()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");
@@ -659,7 +659,7 @@ public sealed class TicketTests
     [Fact]
     public void AddComment_should_update_ticket_version()
     {
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Printer is unavailable",
             "The printer does not respond.");

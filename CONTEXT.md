@@ -74,6 +74,18 @@ _Avoid_: Audit log, activity table
 The operational urgency assigned to a Ticket. V2 supports Low, Medium, High, and Urgent priority.
 _Avoid_: Severity, importance
 
+**SLA Policy**:
+The active resolution duration OpsDesk applies to a new Ticket for one Ticket Priority. Changing a policy does not change deadlines already assigned to existing Tickets.
+_Avoid_: Deadline, timeout
+
+**SLA Deadline**:
+The immutable UTC time by which a Ticket is expected to be resolved. It starts from the Ticket's creation time and continues while the Ticket is Waiting for Customer.
+_Avoid_: Expiration time, due date
+
+**SLA Breach**:
+The condition in which a Ticket remains unresolved after its SLA Deadline or was resolved after that deadline. Reopening a Ticket keeps the original deadline.
+_Avoid_: Ticket expiration, automatic escalation
+
 **Ticket Status History**:
 The user-visible sequence of status changes made during a Ticket's lifetime.
 _Avoid_: Audit log

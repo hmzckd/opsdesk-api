@@ -21,10 +21,14 @@
 | `V20`, `V21`, `V22` | Versioned implementation work |
 | `REL` | Release validation and release bookkeeping |
 | `AUTH` | Authentication, identity, and onboarding |
+| `V3-D` | V3 product and domain contract decisions |
+| `V30` | V3 implementation work |
 
 ## Current Queue
 
-No active task. The authentication package completed its final review on 2026-09-10.
+| Order | Task | Status | Dependency |
+| ---: | --- | --- | --- |
+
 
 ## Completed Tasks
 
@@ -59,6 +63,8 @@ No active task. The authentication package completed its final review on 2026-09
 | AUTH-006 - Reset Forgotten Passwords | 2026-09-10T10:59:27.994Z | Local task |
 | AUTH-004 - Disable Public Registration in Production | 2026-09-10T10:59:27.994Z | Backlog |
 | AUTH-005 - Integrate Corporate SSO | 2026-09-10T10:59:27.994Z | Backlog |
+| V3-D01 - Define the SLA Policy and Deadline Contract | 2026-09-10T11:20:23.300Z | Local task |
+| V30-001 - Calculate and Persist Ticket SLA Deadlines | 2026-09-11T11:30:59.644Z | Local task |
 
 ### Authentication Package Final Review - 2026-09-10
 
@@ -70,6 +76,137 @@ No active task. The authentication package completed its final review on 2026-09
 - Final evidence: 331 tests passed, 0 failed/skipped; build completed with 0 warnings/errors; Slopwatch reported 0 issues; base and opt-in SSO Compose configurations parsed successfully.
 
 ## Full Task Records
+
+### V3-D01 - Define the SLA Policy and Deadline Contract
+
+- Local status: `Done`
+- Completed: `Yes`
+- Completed at: `2026-09-10T11:20:23.300Z`
+- Source: User-approved local task, 2026-09-10.
+- Dependency: The released v2.3.0 Ticket lifecycle.
+
+#### Task's Purpose
+
+Define what an SLA means for an OpsDesk Ticket before database columns, calculation code, or background processing are introduced.
+
+#### Accepted Product Decisions
+
+- The first SLA version tracks one resolution deadline; a separate first-response SLA is out of scope.
+- The applicable duration is selected from the Ticket's priority when the Ticket is created.
+- Resolution durations are `low = 7 days`, `medium = 4 days`, `high = 2 days`, and `urgent = 24 hours`.
+- SLA uses continuous 24/7 elapsed time in UTC; business calendars, holidays, and time zones are out of scope.
+- The clock starts at `Ticket.CreatedAtUtc`.
+- `waiting_customer` does not pause or extend the deadline.
+- The calculated deadline is a snapshot. Later policy changes do not rewrite existing Tickets.
+- Resolving or closing a Ticket stops the active countdown, while a resolution after the deadline still counts as a breach.
+- Reopening a Ticket does not reset its original deadline in the first version.
+- V30-001 will expose the deadline and current breach state. V30-002 may persist breach detection in a background job.
+- Notifications and escalations are out of scope until a separate contract is approved.
+
+#### Request and Data Flow
+
+`POST /tickets` selects the active policy for the requested priority -> the Application workflow asks the Domain calculation for a deadline -> the Ticket stores the policy reference and deadline -> Infrastructure saves both atomically -> Ticket responses expose safe SLA summary fields.
+
+The calculation belongs to Domain because it expresses a business rule and needs no HTTP or PostgreSQL knowledge. Selecting and storing an active policy belongs to the Application workflow through an Infrastructure repository adapter. API only receives and returns DTOs.
+
+#### Resolution Durations
+
+| Priority | Resolution duration |
+| --- | --- |
+| `low` | 7 days |
+| `medium` | 4 days |
+| `high` | 2 days |
+| `urgent` | 24 hours |
+
+All four values are elapsed durations. `urgent = 24 hours` does not mean the end of the local calendar day.
+
+#### Acceptance Scenarios
+
+```gherkin
+Given an active SLA duration exists for a Ticket priority
+When a Customer creates a Ticket with that priority
+Then the Ticket stores a deadline calculated from its server-owned creation time
+And later policy changes do not alter that deadline
+
+Given a Ticket is waiting for the Customer
+When time continues to pass
+Then the SLA deadline is not paused or extended
+
+Given a Ticket is resolved after its deadline
+When its SLA state is requested
+Then the Ticket is reported as breached
+
+Given a resolved Ticket is reopened
+When its SLA state is requested
+Then the original deadline remains in effect
+```
+
+#### Planned TDD Slices
+
+1. Domain calculation: creation time plus policy duration produces the deadline.
+2. Persistence: a Ticket stores its policy snapshot and deadline in PostgreSQL.
+3. HTTP creation: the response exposes the calculated SLA fields.
+4. Read behavior: active, on-time resolved, late resolved, and reopened Tickets report the correct state.
+5. Background detection is deferred to V30-002 and will receive its own approved scenarios.
+
+#### Skills
+
+- Applied `domain-modeling` to give deadline, breach, policy snapshot, and countdown precise meanings.
+- Applied `codebase-design` to keep calculation behind a small Domain interface while policy persistence remains an Infrastructure adapter.
+- Skipped `tdd` because this task defines behavior but does not yet change production code or automated tests.
+
+### V30-001 - Calculate and Persist Ticket SLA Deadlines
+
+- Local status: `Done`
+- Completed: `Yes`
+- Completed at: `2026-09-11T11:30:59.644Z`
+- Source: V3-D01 approved SLA contract.
+- Dependency: V3-D01.
+
+#### Task's Purpose
+
+Calculate an immutable resolution deadline when a Ticket is created, persist the selected SLA policy snapshot, and expose safe SLA fields in Ticket responses.
+
+#### Expected User Flow
+
+A Customer creates a Ticket with a priority. OpsDesk selects the active duration for that priority, calculates the deadline from the server-owned creation time, stores it in the same database operation as the Ticket, and returns the deadline and current breach state in API responses.
+
+#### Affected Layers
+
+- Domain: represent the SLA deadline and calculate it from an approved duration.
+- Application: select the policy and coordinate Ticket creation and response mapping.
+- Infrastructure: persist SLA policies and the Ticket's policy/deadline snapshot with EF Core and PostgreSQL.
+- API: expose SLA response fields without accepting client-owned dates.
+- Tests: verify calculations, migrations, persistence, API contracts, and role-safe Ticket reads.
+
+#### Acceptance Scenarios
+
+```gherkin
+Given the active urgent policy has a 24-hour resolution duration
+When a Customer creates an urgent Ticket
+Then its SLA deadline is exactly 24 hours after its server-owned creation time
+And the client cannot provide or override that deadline
+
+Given a Ticket stored the active policy and deadline when it was created
+When an administrator later changes the policy duration
+Then the existing Ticket keeps its original deadline
+
+Given an active Ticket has passed its SLA deadline
+When an authorized User reads the Ticket
+Then the response reports that its SLA is breached
+```
+
+Implementation requires a separate user-approved code plan before production files, tests, packages, or migrations are changed.
+
+#### Implementation Progress
+
+- Added the SLA Policy Domain model, immutable Ticket deadline snapshot, and runtime breach calculation.
+- Added active-policy selection through an Application repository seam and PostgreSQL adapter.
+- Added EF Core policy seeding, Ticket SLA mapping, indexes, and the `AddTicketSlaDeadlines` migration with existing-Ticket backfill.
+- Added SLA fields to Ticket creation, detail, and collection responses without accepting client-owned deadline values.
+- Added Domain and HTTP integration coverage, including deterministic time advancement.
+- Final verification: 343 tests passed with zero failures or skips, including real PostgreSQL migration backfill and deterministic SLA HTTP scenarios.
+- The changed-file whitespace check passed, EF Core reports no pending model changes, and Slopwatch reported zero issues.
 
 ### AUTH-002 - Verify Email Ownership End to End
 

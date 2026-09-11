@@ -65,6 +65,13 @@ public sealed class TicketDetailsIntegrationTests
             TimeSpan.FromMilliseconds(1));
         Assert.Equal(createdTicket.ResolvedAtUtc, returnedTicket.ResolvedAtUtc);
         Assert.Equal(createdTicket.ClosedAtUtc, returnedTicket.ClosedAtUtc);
+        Assert.Equal(
+            createdTicket.SlaDeadlineUtc,
+            returnedTicket.SlaDeadlineUtc,
+            TimeSpan.FromMilliseconds(1));
+        Assert.Equal(
+            createdTicket.IsSlaBreached,
+            returnedTicket.IsSlaBreached);
     }
 
     /// <summary>

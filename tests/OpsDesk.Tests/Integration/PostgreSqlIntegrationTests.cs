@@ -6,6 +6,8 @@ using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Domain.Entities;
 using OpsDesk.Domain.Enums;
 using OpsDesk.Infrastructure.Persistence;
+using OpsDesk.Infrastructure.Persistence.Configurations;
+using OpsDesk.Tests.Tickets;
 
 namespace OpsDesk.Tests.Integration;
 
@@ -93,10 +95,11 @@ public sealed class PostgreSqlIntegrationTests
 
         await userRepository.AddAsync(requester);
 
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             requester.Id,
             "Database integration test",
-            "This Ticket must be stored in PostgreSQL.");
+            "This Ticket must be stored in PostgreSQL.",
+            policyId: SlaPolicyConfiguration.MediumPolicyId);
 
         await ticketRepository.AddAsync(ticket);
 
@@ -122,10 +125,11 @@ public sealed class PostgreSqlIntegrationTests
             scope.ServiceProvider
                 .GetRequiredService<ITicketRepository>();
 
-        Ticket ticket = Ticket.Create(
+        Ticket ticket = TicketTestFactory.Create(
             Guid.NewGuid(),
             "Unknown requester",
-            "The requester does not exist in the users table.");
+            "The requester does not exist in the users table.",
+            policyId: SlaPolicyConfiguration.MediumPolicyId);
 
         await Assert.ThrowsAsync<DbUpdateException>(() =>
             repository.AddAsync(ticket));
@@ -151,10 +155,11 @@ public sealed class PostgreSqlIntegrationTests
                 $"atomic-{Guid.NewGuid():N}@example.com");
             await userRepository.AddAsync(requester);
 
-            Ticket ticket = Ticket.Create(
+            Ticket ticket = TicketTestFactory.Create(
                 requester.Id,
                 "Atomic status change",
-                "The Ticket update must roll back with its event.");
+                "The Ticket update must roll back with its event.",
+                policyId: SlaPolicyConfiguration.MediumPolicyId);
             await ticketRepository.AddAsync(ticket);
             ticketId = ticket.Id;
 

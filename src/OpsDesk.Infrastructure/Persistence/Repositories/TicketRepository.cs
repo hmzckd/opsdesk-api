@@ -26,6 +26,7 @@ public sealed class TicketRepository : ITicketRepository
             Guid viewerId,
             UserRole viewerRole,
             TicketListQuery listQuery,
+            DateTime observedAtUtc,
             CancellationToken cancellationToken = default)
     {
         IQueryable<Ticket> query =
@@ -100,7 +101,12 @@ public sealed class TicketRepository : ITicketRepository
                     ticket.RequesterId,
                     ticket.AssigneeId,
                     ticket.CreatedAtUtc,
-                    ticket.UpdatedAtUtc))
+                    ticket.UpdatedAtUtc,
+                    ticket.SlaDeadlineUtc,
+                    ticket.ResolvedAtUtc.HasValue
+                        ? ticket.ResolvedAtUtc.Value >
+                            ticket.SlaDeadlineUtc
+                        : observedAtUtc > ticket.SlaDeadlineUtc))
                 .ToListAsync(cancellationToken);
         }
 

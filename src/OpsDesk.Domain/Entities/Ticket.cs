@@ -33,16 +33,76 @@ public sealed class Ticket
 
     public DateTime? ClosedAtUtc { get; private set; }
 
+    public Guid SlaPolicyId { get; private set; }
+
+    public DateTime SlaDeadlineUtc { get; private set; }
+
     public Guid ConcurrencyToken { get; private set; }
 
     /// <summary>
-    /// Creates a valid Ticket with normalized text and server-owned defaults.
+    /// Reports whether the Ticket missed its immutable resolution deadline.
+    /// </summary>
+    public bool IsSlaBreachedAt(DateTime observedAtUtc)
+    {
+        if (observedAtUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException(
+                "SLA observation time must be UTC.",
+                nameof(observedAtUtc));
+        }
+
+        DateTime effectiveResolutionTime =
+            ResolvedAtUtc ?? observedAtUtc;
+
+        return effectiveResolutionTime > SlaDeadlineUtc;
+    }
+
+    /// <summary>
+    /// Creates a valid Ticket and snapshots its selected SLA deadline.
     /// </summary>
     public static Ticket Create(
         Guid requesterId,
         string? title,
         string? description,
+        SlaPolicy slaPolicy,
+        DateTime createdAtUtc,
         TicketPriority? priority = null)
+    {
+        ArgumentNullException.ThrowIfNull(slaPolicy);
+
+        TicketPriority resolvedPriority =
+            priority ?? TicketPriority.Medium;
+
+        if (slaPolicy.Priority != resolvedPriority)
+        {
+            throw new ArgumentException(
+                "SLA policy priority must match the Ticket priority.",
+                nameof(slaPolicy));
+        }
+
+        Ticket ticket = CreateCore(
+            requesterId,
+            title,
+            description,
+            resolvedPriority,
+            createdAtUtc);
+
+        ticket.SlaPolicyId = slaPolicy.Id;
+        ticket.SlaDeadlineUtc =
+            slaPolicy.CalculateDeadline(createdAtUtc);
+
+        return ticket;
+    }
+
+    /// <summary>
+    /// Creates the shared Ticket fields after caller-specific inputs are resolved.
+    /// </summary>
+    private static Ticket CreateCore(
+        Guid requesterId,
+        string? title,
+        string? description,
+        TicketPriority resolvedPriority,
+        DateTime createdAtUtc)
     {
         if (requesterId == Guid.Empty)
         {
@@ -61,18 +121,20 @@ public sealed class Ticket
             nameof(description),
             MaximumDescriptionLength);
 
-        TicketPriority resolvedPriority =
-            priority ?? TicketPriority.Medium;
-
         if (!Enum.IsDefined(resolvedPriority))
         {
             throw new ArgumentOutOfRangeException(
-                nameof(priority),
-                priority,
+                nameof(resolvedPriority),
+                resolvedPriority,
                 "Ticket priority is not supported.");
         }
 
-        DateTime nowUtc = DateTime.UtcNow;
+        if (createdAtUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException(
+                "Ticket creation time must be UTC.",
+                nameof(createdAtUtc));
+        }
 
         return new Ticket
         {
@@ -83,8 +145,8 @@ public sealed class Ticket
             Status = TicketStatus.Open,
             RequesterId = requesterId,
             AssigneeId = null,
-            CreatedAtUtc = nowUtc,
-            UpdatedAtUtc = nowUtc,
+            CreatedAtUtc = createdAtUtc,
+            UpdatedAtUtc = createdAtUtc,
             ResolvedAtUtc = null,
             ClosedAtUtc = null,
             ConcurrencyToken = Guid.NewGuid()

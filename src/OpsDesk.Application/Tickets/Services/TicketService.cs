@@ -2,6 +2,7 @@ using System.Text.Json;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Application.Common.Pagination;
+using OpsDesk.Application.Sla.Interfaces;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Application.Tickets.Queries;
@@ -14,13 +15,19 @@ public sealed class TicketService : ITicketService
 {
     private readonly ITicketRepository _ticketRepository;
     private readonly IUserRepository _userRepository;
+    private readonly ISlaPolicyRepository _slaPolicyRepository;
+    private readonly TimeProvider _timeProvider;
 
     public TicketService(
         ITicketRepository ticketRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        ISlaPolicyRepository slaPolicyRepository,
+        TimeProvider timeProvider)
     {
         _ticketRepository = ticketRepository;
         _userRepository = userRepository;
+        _slaPolicyRepository = slaPolicyRepository;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>
@@ -64,6 +71,7 @@ public sealed class TicketService : ITicketService
             viewerId,
             viewerRole,
             query,
+            _timeProvider.GetUtcNow().UtcDateTime,
             cancellationToken);
     }
 
@@ -668,11 +676,26 @@ public sealed class TicketService : ITicketService
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        TicketPriority priority =
+            request.Priority ?? TicketPriority.Medium;
+
+        SlaPolicy slaPolicy =
+            await _slaPolicyRepository.GetActiveForPriorityAsync(
+                priority,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"No active SLA policy exists for {priority}.");
+
+        DateTime createdAtUtc =
+            _timeProvider.GetUtcNow().UtcDateTime;
+
         Ticket ticket = Ticket.Create(
             requesterId,
             request.Title,
             request.Description,
-            request.Priority);
+            slaPolicy,
+            createdAtUtc,
+            priority);
 
         await _ticketRepository.AddAsync(
             ticket,
@@ -713,7 +736,7 @@ public sealed class TicketService : ITicketService
     /// <summary>
     /// Converts a Domain Ticket into the API-safe response contract.
     /// </summary>
-    private static TicketResponse MapToResponse(Ticket ticket)
+    private TicketResponse MapToResponse(Ticket ticket)
     {
         return new TicketResponse(
             ticket.Id,
@@ -726,7 +749,10 @@ public sealed class TicketService : ITicketService
             ticket.CreatedAtUtc,
             ticket.UpdatedAtUtc,
             ticket.ResolvedAtUtc,
-            ticket.ClosedAtUtc);
+            ticket.ClosedAtUtc,
+            ticket.SlaDeadlineUtc,
+            ticket.IsSlaBreachedAt(
+                _timeProvider.GetUtcNow().UtcDateTime));
     }
 
     /// <summary>

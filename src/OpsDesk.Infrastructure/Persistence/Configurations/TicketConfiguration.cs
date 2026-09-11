@@ -67,6 +67,15 @@ public sealed class TicketConfiguration :
             .HasColumnName("closed_at_utc")
             .HasColumnType("timestamp with time zone");
 
+        builder.Property(ticket => ticket.SlaPolicyId)
+            .HasColumnName("sla_policy_id")
+            .IsRequired();
+
+        builder.Property(ticket => ticket.SlaDeadlineUtc)
+            .HasColumnName("sla_deadline_utc")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
         builder.Property(ticket => ticket.ConcurrencyToken)
             .HasColumnName("concurrency_token")
             .IsRequired()
@@ -84,10 +93,22 @@ public sealed class TicketConfiguration :
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_tickets_assignee");
 
+        builder.HasOne<SlaPolicy>()
+            .WithMany()
+            .HasForeignKey(ticket => ticket.SlaPolicyId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_tickets_sla_policy");
+
         builder.HasIndex(ticket => ticket.RequesterId)
             .HasDatabaseName("ix_tickets_requester_id");
 
         builder.HasIndex(ticket => ticket.AssigneeId)
             .HasDatabaseName("ix_tickets_assignee_id");
+
+        builder.HasIndex(ticket => ticket.SlaPolicyId)
+            .HasDatabaseName("ix_tickets_sla_policy_id");
+
+        builder.HasIndex(ticket => ticket.SlaDeadlineUtc)
+            .HasDatabaseName("ix_tickets_sla_deadline_utc");
     }
 }

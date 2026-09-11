@@ -17,6 +17,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 - Admin-only Agent account provisioning with server-owned roles
 - Policy-based authorization and Ticket visibility
 - Ticket creation with server-owned status, requester, and timestamps
+- Priority-based resolution SLA deadlines and current breach state
 - Ticket detail access for the requester, eligible Agents, and Admins
 - Agent self-assignment and Admin assignment management
 - Assignment activity with optimistic concurrency protection
@@ -210,6 +211,8 @@ Keycloak `start-dev` is only a local test provider. A production deployment must
 - `description` is required and accepts at most 5,000 characters.
 - `priority` is optional and defaults to `medium`.
 - Priority values are `low`, `medium`, `high`, and `urgent`.
+- Resolution SLA durations are 7 days for `low`, 4 days for `medium`, 2 days for `high`, and 24 hours for `urgent`.
+- Ticket creation, detail, and collection responses expose `slaDeadlineUtc` and the calculated `isSlaBreached` state; clients cannot provide either value.
 - Comment content is required and accepts at most 4,000 characters.
 - Reopen reason is required and uses the same 4,000-character limit as a public comment.
 - OpenAPI publishes required fields, string limits, and enum values for API clients and frontend controls.
@@ -342,6 +345,8 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - The activity endpoint combines existing records instead of duplicating them in a separate activity table.
 - Customers see public comments and status changes; assignment history remains internal to Agents and Admins.
 - Activity items include safe actor summaries and use time, type, then ID for deterministic ordering.
+- A Ticket snapshots its active priority policy and UTC resolution deadline when created; later policy changes and reopen operations do not recalculate that deadline.
+- SLA breach is derived from the stored deadline and resolution or observation time instead of persisting a time-sensitive boolean.
 - Global exception handling maps expected failures to consistent API responses.
 
 ## Roadmap
@@ -349,7 +354,7 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - `V2.0`: Ticket creation, visibility, lifecycle, and status history
 - `V2.1`: Ticket comments, assignment, and activity timeline
 - `V2.2`: Ticket filtering, sorting, and pagination
-- `V3`: SLA policies, audit logs, approvals, and background jobs
+- `V3`: SLA policies and deadlines, followed by audit logs, approvals, and background jobs
 - `V4`: Human-approved .NET AI triage and summarization
 - `V5`: Optional Python worker for embeddings, similarity search, and reranking
 

@@ -25,6 +25,8 @@ public sealed class OpsDeskApiFactory :
 
     private readonly string _connectionString;
 
+    public string ConnectionString => _connectionString;
+
     public ConcurrentQueue<EmailVerificationEmail> SentEmails { get; } = new();
     public ConcurrentQueue<InvitationEmail> SentInvitations { get; } = new();
     public PasswordResetMailbox PasswordResetEmails { get; } = new();

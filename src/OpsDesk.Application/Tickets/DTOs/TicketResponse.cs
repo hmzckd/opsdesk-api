@@ -16,4 +16,6 @@ public sealed record TicketResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     DateTime? ResolvedAtUtc,
-    DateTime? ClosedAtUtc);
+    DateTime? ClosedAtUtc,
+    DateTime SlaDeadlineUtc,
+    bool IsSlaBreached);

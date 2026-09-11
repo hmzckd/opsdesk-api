@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Invitations.Interfaces;
+using OpsDesk.Application.Sla.Interfaces;
 using OpsDesk.Application.Tickets.Interfaces;
 using OpsDesk.Infrastructure.Authentication;
 using OpsDesk.Infrastructure.Email;
@@ -53,6 +54,7 @@ public static class DependencyInjection
             IEmailVerificationTokenRepository,
             EmailVerificationTokenRepository>();
         services.AddScoped<ITicketRepository, TicketRepository>();
+        services.AddScoped<ISlaPolicyRepository, SlaPolicyRepository>();
         services.AddScoped<AdminUserSeeder>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();

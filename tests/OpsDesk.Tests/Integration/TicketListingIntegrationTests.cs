@@ -70,6 +70,17 @@ public sealed class TicketListingIntegrationTests
         Assert.Equal(
             [secondTicket.Id, firstTicket.Id],
             returnedIds);
+
+        TicketListItem firstListItem = result.Items
+            .Single(ticket => ticket.Id == firstTicket.Id);
+
+        Assert.Equal(
+            firstTicket.SlaDeadlineUtc,
+            firstListItem.SlaDeadlineUtc,
+            TimeSpan.FromMilliseconds(1));
+        Assert.Equal(
+            firstTicket.IsSlaBreached,
+            firstListItem.IsSlaBreached);
     }
 
     /// <summary>
@@ -349,6 +360,8 @@ public sealed class TicketListingIntegrationTests
         Assert.True(item.TryGetProperty("assigneeId", out _));
         Assert.True(item.TryGetProperty("createdAtUtc", out _));
         Assert.True(item.TryGetProperty("updatedAtUtc", out _));
+        Assert.True(item.TryGetProperty("slaDeadlineUtc", out _));
+        Assert.True(item.TryGetProperty("isSlaBreached", out _));
         Assert.False(item.TryGetProperty("description", out _));
         Assert.False(item.TryGetProperty("resolvedAtUtc", out _));
         Assert.False(item.TryGetProperty("closedAtUtc", out _));
@@ -521,7 +534,10 @@ public sealed class TicketListingIntegrationTests
         bool HasPreviousPage,
         bool HasNextPage);
 
-    private sealed record TicketListItem(Guid Id);
+    private sealed record TicketListItem(
+        Guid Id,
+        DateTime SlaDeadlineUtc,
+        bool IsSlaBreached);
 
     private sealed record AgentCredentials(
         Guid Id,
