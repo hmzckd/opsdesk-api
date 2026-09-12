@@ -67,7 +67,7 @@ A public message added to a Ticket conversation by an authenticated User. A Tick
 _Avoid_: Internal note, audit entry
 
 **Ticket Activity Timeline**:
-A chronological read view that combines existing Ticket Comments, Ticket Status Changes, and role-appropriate Ticket Assignment Changes. It is not a separate permanent record. Customers see public activity only; Agents and Admins can also see internal assignment activity.
+A chronological read view that combines existing Ticket Comments, Ticket Status Changes, system-generated SLA Breaches, and role-appropriate Ticket Assignment Changes. It is not a separate permanent record. Customers see public activity only; Agents and Admins can also see internal assignment activity. A system-generated item has no User actor.
 _Avoid_: Audit log, activity table
 
 **Ticket Priority**:
@@ -83,7 +83,7 @@ The immutable UTC time by which a Ticket is expected to be resolved. It starts f
 _Avoid_: Expiration time, due date
 
 **SLA Breach**:
-The condition in which a Ticket remains unresolved after its SLA Deadline or was resolved after that deadline. Reopening a Ticket keeps the original deadline.
+The condition in which a Ticket remains unresolved after its SLA Deadline or was resolved after that deadline. Reopening a Ticket keeps the original deadline. The current state is calculated from the Ticket snapshot, while the first detected breach is stored once as a durable system event. PostgreSQL performs the bounded insert atomically, enforces one event per Ticket, and checks that detection happened after the stored deadline. This database-owned creation path prevents duplicate events across concurrent workers, so no unused Domain factory is exposed for creating breach records.
 _Avoid_: Ticket expiration, automatic escalation
 
 **Ticket Status History**:

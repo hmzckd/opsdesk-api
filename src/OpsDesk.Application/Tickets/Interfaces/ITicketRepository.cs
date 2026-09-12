@@ -71,6 +71,13 @@ public interface ITicketRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Runs one related write workflow inside a single database transaction.
+    /// </summary>
+    Task<TResult> ExecuteInWriteTransactionAsync<TResult>(
+        Func<CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves one Ticket with EF Core change tracking enabled.
     /// </summary>
     Task<Ticket?> GetForUpdateAsync(

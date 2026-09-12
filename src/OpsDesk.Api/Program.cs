@@ -23,6 +23,8 @@ using OpsDesk.Infrastructure.Seed;
 using OpsDesk.Infrastructure.Authentication;
 using OpsDesk.Infrastructure.Persistence;
 using OpsDesk.Application.Authorization;
+using OpsDesk.Application.Sla.Interfaces;
+using OpsDesk.Application.Sla.Services;
 using OpsDesk.Domain.Enums;
 using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -30,6 +32,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRegistrationConfiguration();
 builder.Services.AddSsoConfiguration();
+builder.Services.AddSlaBreachMonitoring();
 
 builder.Services.AddScoped<OpsDesk.Application.Invitations.Interfaces.IInvitationService,
     OpsDesk.Application.Invitations.Services.InvitationService>();
@@ -61,6 +64,7 @@ builder.Services.AddScoped<
     IEmailVerificationService,
     EmailVerificationService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
+builder.Services.AddScoped<ISlaBreachService, SlaBreachService>();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 

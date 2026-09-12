@@ -106,7 +106,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `GET` | `/tickets/{id}/status-history` | Authenticated and visible | Read chronological status history with actor IDs |
 | `POST` | `/tickets/{id}/comments` | Authenticated and visible | Add a public comment with server-owned author and time |
 | `GET` | `/tickets/{id}/comments` | Authenticated and visible | Read public comments from oldest to newest |
-| `GET` | `/tickets/{id}/activity` | Authenticated and visible | Read the role-appropriate combined comment, status, and assignment timeline |
+| `GET` | `/tickets/{id}/activity` | Authenticated and visible | Read the role-appropriate comment, status, assignment, and system-generated `sla_breached` timeline; system events have `actor: null` |
 | `GET` | `/admin/access` | Admin | Verify the `AdminOnly` policy |
 | `GET` | `/health` | Anonymous | Check API process health |
 | `GET` | `/swagger` | Anonymous | Open interactive API documentation |
@@ -346,7 +346,8 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - Customers see public comments and status changes; assignment history remains internal to Agents and Admins.
 - Activity items include safe actor summaries and use time, type, then ID for deterministic ordering.
 - A Ticket snapshots its active priority policy and UTC resolution deadline when created; later policy changes and reopen operations do not recalculate that deadline.
-- SLA breach is derived from the stored deadline and resolution or observation time instead of persisting a time-sensitive boolean.
+- Current SLA breach state is derived from the stored deadline and resolution or observation time instead of persisting a time-sensitive boolean.
+- A configurable background worker atomically stores at most one durable SLA breach event per Ticket; the event appears in authorized activity timelines with no User actor.
 - Global exception handling maps expected failures to consistent API responses.
 
 ## Roadmap

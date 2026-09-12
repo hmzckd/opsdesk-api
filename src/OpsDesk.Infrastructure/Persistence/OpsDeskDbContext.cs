@@ -25,6 +25,9 @@ public sealed class OpsDeskDbContext : DbContext
 
     public DbSet<SlaPolicy> SlaPolicies => Set<SlaPolicy>();
 
+    public DbSet<TicketSlaBreach> TicketSlaBreaches =>
+        Set<TicketSlaBreach>();
+
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
 
     public DbSet<TicketStatusChange> TicketStatusChanges =>

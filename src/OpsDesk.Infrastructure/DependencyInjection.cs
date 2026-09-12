@@ -55,6 +55,7 @@ public static class DependencyInjection
             EmailVerificationTokenRepository>();
         services.AddScoped<ITicketRepository, TicketRepository>();
         services.AddScoped<ISlaPolicyRepository, SlaPolicyRepository>();
+        services.AddScoped<ISlaBreachRepository, SlaBreachRepository>();
         services.AddScoped<AdminUserSeeder>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();

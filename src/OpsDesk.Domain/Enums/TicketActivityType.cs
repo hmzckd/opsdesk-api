@@ -7,5 +7,6 @@ public enum TicketActivityType
 {
     CommentAdded,
     StatusChanged,
-    AssignmentChanged
+    AssignmentChanged,
+    SlaBreached
 }

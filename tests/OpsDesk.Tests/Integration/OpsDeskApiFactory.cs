@@ -76,6 +76,7 @@ public sealed class OpsDeskApiFactory :
                         ["Jwt:ExpirationMinutes"] = "60",
                         ["PasswordRecovery:WorkerEnabled"] = "false",
                         ["EmailVerification:WorkerEnabled"] = "false",
+                        ["SlaBreach:WorkerEnabled"] = "false",
                         ["Registration:PublicRegistrationEnabled"] = "true",
                         ["AdminSeed:Enabled"] = "true",
                         ["AdminSeed:FirstName"] = "Test",

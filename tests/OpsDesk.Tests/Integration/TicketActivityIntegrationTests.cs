@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OpsDesk.Application.Auth.DTOs;
 using OpsDesk.Application.Auth.Interfaces;
+using OpsDesk.Application.Sla.Interfaces;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Domain.Entities;
 using OpsDesk.Domain.Enums;
@@ -323,6 +324,73 @@ public sealed class TicketActivityIntegrationTests
         Assert.Contains(
             activity,
             item => item.Type == TicketActivityType.CommentAdded);
+    }
+
+    /// <summary>
+    /// Verifies every authorized viewer sees a system-generated SLA breach.
+    /// </summary>
+    [Theory]
+    [InlineData(UserRole.Customer)]
+    [InlineData(UserRole.Agent)]
+    [InlineData(UserRole.Admin)]
+    public async Task Authorized_viewer_should_see_sla_breach_with_no_actor(
+        UserRole viewerRole)
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        AuthResponse requester = await RegisterCustomerAsync(client);
+        _factory.VerifyAccount(requester.AccessToken);
+        SetBearerToken(client, requester.AccessToken);
+        TicketResponse ticket = await CreateTicketAsync(client);
+        AuthResponse viewer = requester;
+
+        if (viewerRole == UserRole.Agent)
+        {
+            viewer = await CreateAgentAsync(client);
+            _factory.VerifyAccount(viewer.AccessToken);
+            SetBearerToken(client, viewer.AccessToken);
+            await AssignTicketAsync(client, ticket.Id, viewer.UserId);
+        }
+        else if (viewerRole == UserRole.Admin)
+        {
+            viewer = await CreateStaffUserAsync(client, UserRole.Admin);
+            _factory.VerifyAccount(viewer.AccessToken);
+        }
+
+        await using (AsyncServiceScope scope =
+            _factory.Services.CreateAsyncScope())
+        {
+            OpsDeskDbContext dbContext = scope.ServiceProvider
+                .GetRequiredService<OpsDeskDbContext>();
+
+            await dbContext.Tickets
+                .Where(item => item.Id == ticket.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    item => item.SlaDeadlineUtc,
+                    DateTime.UtcNow.AddMinutes(-1)));
+
+            ISlaBreachService breachService = scope.ServiceProvider
+                .GetRequiredService<ISlaBreachService>();
+
+            await breachService.DetectAndRecordAsync(100);
+        }
+
+        SetBearerToken(client, viewer.AccessToken);
+        HttpResponseMessage response =
+            await client.GetAsync($"/tickets/{ticket.Id}/activity");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using JsonDocument document = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync());
+        JsonElement activity = document.RootElement;
+        JsonElement slaActivity = activity.EnumerateArray().Single(
+            item => item.GetProperty("type").GetString() ==
+                "sla_breached");
+
+        Assert.Equal(
+            JsonValueKind.Null,
+            slaActivity.GetProperty("actor").ValueKind);
     }
 
     /// <summary>

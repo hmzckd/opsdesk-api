@@ -548,6 +548,27 @@ public sealed class TicketService : ITicketService
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        return await _ticketRepository.ExecuteInWriteTransactionAsync(
+            transactionCancellationToken =>
+                ChangeStatusWithinTransactionAsync(
+                    ticketId,
+                    actorId,
+                    actorRole,
+                    request,
+                    transactionCancellationToken),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Applies one authorized status transition while its Ticket row is locked.
+    /// </summary>
+    private async Task<TicketResponse?> ChangeStatusWithinTransactionAsync(
+        Guid ticketId,
+        Guid actorId,
+        UserRole actorRole,
+        ChangeTicketStatusRequest request,
+        CancellationToken cancellationToken)
+    {
         Ticket? ticket;
 
         switch (actorRole)
@@ -619,7 +640,8 @@ public sealed class TicketService : ITicketService
         }
 
         TicketStatus previousStatus = ticket.Status;
-        DateTime changedAtUtc = DateTime.UtcNow;
+        DateTime changedAtUtc =
+            _timeProvider.GetUtcNow().UtcDateTime;
 
         try
         {

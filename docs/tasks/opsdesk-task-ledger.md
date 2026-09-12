@@ -26,9 +26,7 @@
 
 ## Current Queue
 
-| Order | Task | Status | Dependency |
-| ---: | --- | --- | --- |
-
+No queued tasks.
 
 ## Completed Tasks
 
@@ -65,6 +63,9 @@
 | AUTH-005 - Integrate Corporate SSO | 2026-09-10T10:59:27.994Z | Backlog |
 | V3-D01 - Define the SLA Policy and Deadline Contract | 2026-09-10T11:20:23.300Z | Local task |
 | V30-001 - Calculate and Persist Ticket SLA Deadlines | 2026-09-11T11:30:59.644Z | Local task |
+| V3-D02 - Define SLA Breach Monitoring Contract | 2026-09-11T11:42:14.3208976Z | Local task |
+| V30-002 - Detect and Persist SLA Breaches | 2026-09-11T16:29:10.7422909Z | Local task |
+| REL-300 - Validate and Release v3.0.0 | 2026-09-12T23:14:06Z | Local task |
 
 ### Authentication Package Final Review - 2026-09-10
 
@@ -207,6 +208,288 @@ Implementation requires a separate user-approved code plan before production fil
 - Added Domain and HTTP integration coverage, including deterministic time advancement.
 - Final verification: 343 tests passed with zero failures or skips, including real PostgreSQL migration backfill and deterministic SLA HTTP scenarios.
 - The changed-file whitespace check passed, EF Core reports no pending model changes, and Slopwatch reported zero issues.
+
+### V3-D02 - Define SLA Breach Monitoring Contract
+
+- Local status: `Done`
+- Completed: `Yes`
+- Completed at: `2026-09-11T11:42:14.3208976Z`
+- Source: User-approved continuation after V30-001, 2026-09-11.
+- Dependency: V30-001.
+
+#### Task's Purpose
+
+Define how OpsDesk notices and records an SLA breach even when nobody reads the Ticket, without making the existing response calculation depend on a background worker.
+
+#### Current System Behavior
+
+- Ticket responses already derive `isSlaBreached` from the immutable deadline and the current or resolution time.
+- No durable record currently proves when OpsDesk first detected a breach.
+- Existing background workers run outside HTTP requests, create a fresh dependency-injection scope, and use `TimeProvider` plus cancellation tokens.
+
+#### Proposed Contract
+
+- Keep `isSlaBreached` derived at read time; do not persist a duplicate boolean on Ticket.
+- Persist one `TicketSlaBreach` event per Ticket when the approved breach condition first becomes true.
+- Store Ticket ID, SLA policy ID, deadline, and server-owned detection time on the event.
+- Enforce one event per Ticket with a PostgreSQL unique constraint so retries and multiple API instances remain idempotent.
+- Run a configurable worker every 60 seconds and process at most 100 candidates per pass.
+- Detect unresolved overdue Tickets, Tickets resolved after their deadline, and reopened overdue Tickets.
+- A Ticket resolved exactly at its deadline remains on time.
+- If the worker was offline, the next pass records previously missed breaches, including Tickets that were resolved late while it was offline.
+- Reopening keeps the original deadline and does not create a second breach event for a Ticket already recorded as breached.
+- Keep email notifications, Agent escalation, reassignment, and automatic priority or status changes out of V30-002.
+- Add the breach to the existing Ticket activity timeline as a system-generated item visible to every User who may view that Ticket.
+
+#### Proposed Data Flow
+
+`SlaBreachWorker` wakes -> creates a scoped Application service -> Infrastructure atomically inserts newly eligible breach events from PostgreSQL -> later activity reads combine the event with existing comments, status changes, and assignment changes.
+
+The worker belongs to Api hosting because it controls process lifetime. Eligibility orchestration belongs to Application. The event and breach terminology belong to Domain. Candidate selection, uniqueness, and atomic insertion belong to Infrastructure and PostgreSQL.
+
+#### Affected Layers for V30-002
+
+- Domain: `TicketSlaBreach` event data and terminology.
+- Application: one small breach-recording seam and activity response support for a system event.
+- Infrastructure: candidate query, atomic idempotent insert, EF mapping, index, and migration.
+- Api: configurable `BackgroundService` registration.
+- Tests: Domain rules, worker behavior, real PostgreSQL idempotency/concurrency, recovery after downtime, and activity visibility.
+
+#### Approved Decisions
+
+- SLA breach events appear once in the Ticket activity timeline.
+- System-generated activity uses a nullable `Actor`; no fake system User is created.
+- The worker runs every 60 seconds and processes at most 100 database candidates per pass by default.
+- The batch limit controls automatic database work, not the number of Tickets a human Agent must inspect.
+- Notifications and escalation remain outside V30-002 and require a separate future contract.
+
+#### Proposed Acceptance Scenarios
+
+```gherkin
+Given an unresolved Ticket has passed its SLA deadline
+When the SLA breach worker runs
+Then one durable SLA breach event is recorded for that Ticket
+
+Given a breach event already exists for a Ticket
+When the worker retries or another application instance scans the same Ticket
+Then no duplicate breach event is created
+
+Given the worker was offline when a Ticket was resolved after its deadline
+When the worker starts again
+Then the missed breach is recorded
+
+Given a Ticket was resolved exactly at its deadline
+When the worker scans it
+Then no breach event is recorded
+
+Given an authorized User reads the activity of a breached Ticket
+When the activity timeline is returned
+Then the SLA breach appears once as a system-generated event
+```
+
+#### Proposed TDD Slices
+
+1. Define the public Application seam and record one overdue Ticket event.
+2. Prove repeated and concurrent scans remain idempotent in PostgreSQL.
+3. Cover late-resolved, on-time-resolved, and reopened Tickets.
+4. Add the configurable hosted worker with deterministic time and cancellation tests.
+5. Add the system-generated breach item to the authorized activity timeline.
+
+#### Skills
+
+- Applied `domain-modeling` to distinguish a calculated breach state from a durable breach event.
+- Applied `codebase-design` to keep polling, orchestration, and PostgreSQL insertion behind small layer-appropriate interfaces.
+- Deferred `tdd` until the contract and public seam receive explicit user approval.
+
+### V30-002 - Detect and Persist SLA Breaches
+
+- Local status: `Done`
+- Completed: `Yes`
+- Completed at: `2026-09-11T16:29:10.7422909Z`
+- Source: Approved V3-D02 contract, 2026-09-11.
+- Dependency: V3-D02.
+
+#### Implementation Update - 2026-09-11
+
+- Added a durable `TicketSlaBreach` entity and EF Core mapping with a unique Ticket constraint.
+- Added an Application service that uses server UTC and delegates bounded, atomic breach recording to Infrastructure.
+- Added a configurable API-hosted worker that runs immediately and then every 60 seconds with a default batch size of 100.
+- Added PostgreSQL candidate locking and conflict-safe insertion so retries and concurrent instances do not create duplicate events.
+- Added system-generated `sla_breached` entries to the authorized Ticket activity timeline with `actor: null`.
+- Generated the `AddTicketSlaBreaches` migration, but did not apply it to the development database.
+- Verification passed: 354 tests, build with 0 warnings and 0 errors, Slopwatch with 0 issues, and no EF Core model changes pending after the migration.
+- The solution-wide formatting check still reports pre-existing whitespace differences outside this task's scope; no unrelated mass formatting was performed.
+- Git commit, push, and tag operations were not performed.
+
+#### Actually Applied Skills
+
+- `domain-modeling` defined the SLA breach as a durable system event rather than a duplicated Ticket boolean.
+- `codebase-design` kept scheduling, application orchestration, and PostgreSQL persistence behind small layer-specific interfaces.
+- `tdd` guided the overdue, idempotency, concurrency, edge-case, worker, and activity timeline slices.
+- `efcore-patterns` and `database-performance` guided the mapping, bounded query, indexes, and atomic database operation.
+- `csharp-concurrency-patterns` guided cancellation, periodic execution, and one dependency-injection scope per worker pass.
+- `testcontainers-integration-tests` verified the database behavior against real PostgreSQL instances.
+- `csharp-nullable-reference-types` made the activity actor explicitly nullable for system-generated events.
+- `dependency-injection-patterns` and `microsoft-extensions-configuration` guided service registration and validated worker settings.
+- `dotnet-slopwatch` checked that the implementation did not hide failures or weaken tests.
+
+#### Task's Purpose
+
+Automatically detect SLA breaches and create one durable event per Ticket so a breach remains visible even when nobody opened the Ticket at the time it occurred.
+
+#### Approved User Flow
+
+1. A Ticket passes its stored SLA deadline or is resolved after that deadline.
+2. A background worker checks eligible Tickets without requiring an HTTP request.
+3. OpsDesk records at most one SLA breach event for each Ticket.
+4. An authorized User later opens the Ticket activity timeline and sees the system-generated breach entry.
+
+#### Approved Technical Direction
+
+- Keep the response field `isSlaBreached` calculated from Ticket dates.
+- Add a separate durable `TicketSlaBreach` event instead of storing a duplicate boolean on Ticket.
+- Use a PostgreSQL unique constraint on Ticket ID and an atomic insert to prevent duplicates during retries or concurrent application instances.
+- Use a configurable API-hosted background worker with a 60-second interval and a default batch size of 100.
+- Use server time for `DetectedAtUtc`; clients cannot choose the detection time.
+- Return breach activity with `Actor` set to `null`, meaning the action came from OpsDesk rather than a User.
+
+#### Affected Layers
+
+- Domain: represent the `TicketSlaBreach` event and its invariants.
+- Application: expose a small breach-recording interface and extend activity responses for system-generated events.
+- Infrastructure: query eligible Tickets, insert events atomically, configure EF Core mappings, and add a migration.
+- Api: host and configure the recurring worker.
+- Tests: verify domain behavior, worker timing, PostgreSQL idempotency and concurrency, downtime recovery, and timeline visibility.
+
+#### Acceptance Scenarios
+
+```gherkin
+Given an unresolved Ticket has passed its SLA deadline
+When the SLA breach worker runs
+Then one durable SLA breach event is recorded for that Ticket
+
+Given a breach event already exists for a Ticket
+When the worker retries or another application instance scans the same Ticket
+Then no duplicate breach event is created
+
+Given the worker was offline when a Ticket was resolved after its deadline
+When the worker starts again
+Then the missed breach is recorded
+
+Given a Ticket was resolved exactly at its deadline
+When the worker scans it
+Then no breach event is recorded
+
+Given an authorized User reads the activity of a breached Ticket
+When the activity timeline is returned
+Then the SLA breach appears once with no User actor
+```
+
+#### Planned TDD Slices
+
+1. Add the public Application interface and make one overdue Ticket produce one event.
+2. Prove repeated and concurrent PostgreSQL scans cannot create duplicates.
+3. Cover late resolution, exact-deadline resolution, and reopened Ticket behavior.
+4. Add deterministic worker scheduling, scope, configuration, and cancellation tests.
+5. Add the system-generated breach item to the authorized activity timeline.
+
+#### Skills To Evaluate Before Coding
+
+- `domain-modeling` for durable breach event terminology and invariants.
+- `codebase-design` for a small Application interface hiding polling and persistence complexity.
+- `tdd` for vertical red-green implementation slices.
+- `efcore-patterns` and `database-performance` for mapping and bounded candidate selection.
+- `csharp-concurrency-patterns` for hosted worker execution and cancellation.
+- `testcontainers-integration-tests` for real PostgreSQL idempotency and concurrency checks.
+- `dotnet-slopwatch` for post-change shortcut and suppression checks.
+
+### REL-300 - Validate and Release v3.0.0
+
+- Local status: `Done`
+- Completed: `Yes`
+- Completed at: `2026-09-12T23:14:06Z`
+- Source: User-approved local task, 2026-09-11.
+- Dependency: V30-002.
+
+#### Task's Purpose
+
+Verify the complete V3 SLA behavior against the development environment and publish one reproducible `v3.0.0` repository state.
+
+#### Expected Result
+
+- The SLA migrations are applied successfully to the local PostgreSQL development database.
+- Ticket creation stores the selected SLA policy and deadline.
+- The background worker records one durable breach event for an overdue Ticket.
+- The authorized activity timeline returns that event once with `actor: null`.
+- Build, automated tests, EF Core model checks, Slopwatch, and repository diff checks pass.
+- V3 documentation and release metadata describe the behavior that was actually verified.
+- Commit, push, and the `v3.0.0` tag are performed only with separate user approval.
+
+#### Affected Areas
+
+- Infrastructure and database: apply and verify the V3 migrations.
+- Api and Application: exercise the completed public SLA flow without adding a new product feature.
+- Tests: rerun the complete unit and PostgreSQL integration suite.
+- Documentation: record final validation evidence and release scope.
+- Git: create the release commit, push, and tag only after explicit approval.
+
+#### Acceptance Scenarios
+
+```gherkin
+Given the local PostgreSQL database is reachable
+When all pending OpsDesk migrations are applied
+Then the database schema matches the current EF Core model
+
+Given an overdue Ticket exists in the development database
+When the configured SLA breach worker processes it
+Then one durable SLA breach event is stored
+And the Ticket activity timeline shows the event once with no User actor
+
+Given the V3 implementation is ready for release
+When the complete validation suite is run
+Then build, tests, Slopwatch, migration checks, and repository diff checks pass
+
+Given the User approves the verified release state
+When the release Git operations are performed
+Then the commit is pushed and the `v3.0.0` tag points to that commit
+```
+
+#### Planned Validation Order
+
+1. Confirm the already-completed V30-002 review and close release review findings.
+2. Confirm Docker and PostgreSQL availability.
+3. Apply the pending EF Core migration to the local development database.
+4. Run build, all tests, Slopwatch, EF Core model checks, and diff checks.
+5. Exercise the SLA deadline, breach detection, and activity timeline through the running API.
+6. Update the task ledger and release documentation with the observed evidence.
+7. Request separate approval for commit, push, and the `v3.0.0` tag.
+
+#### Skills To Evaluate Before Validation
+
+- `code-review` for standards and approved V3 contract review before release.
+- `efcore-patterns` for migration and model consistency checks.
+- `testcontainers-integration-tests` for the real PostgreSQL test suite.
+- `dotnet-slopwatch` for detecting test weakening, swallowed failures, or warning suppression.
+
+#### Validation Update - 2026-09-11
+
+- Local PostgreSQL became healthy and all ten pending migrations were applied successfully through EF Core, including `AddTicketSlaDeadlines` and `AddTicketSlaBreaches`.
+- EF Core reports every migration as applied and no model changes pending after the latest migration.
+- Build passed with 0 warnings and 0 errors.
+- The complete suite passed with 354 tests, 0 failures, and 0 skipped tests against Docker-backed infrastructure.
+- Slopwatch reported 0 issues and `git diff --check` reported no whitespace errors.
+- Release review remains open: the activity README contract is stale, worker scheduling and recovery coverage is incomplete, and a concurrent on-time resolution can race with durable breach detection.
+- Untracked V30-002 source and test files must be staged explicitly during the separately approved Git step; `.tool-appdata/` must remain uncommitted.
+- `v3.0.0` commit, push, and tag were not performed.
+
+#### Review Closure - 2026-09-13
+
+- V30-002 was already marked Done before REL-300; the remaining release review findings were addressed without changing the approved SLA product contract.
+- A hosted-worker integration scenario now enables SLA monitoring through API configuration and verifies one `sla_breached` item with `actor: null` through `GET /tickets/{id}/activity`. The same scenario failed with the worker disabled and passed with it enabled.
+- The PostgreSQL row-lock race test now has bounded cancellation and always releases its pending status transaction; a separate integration test exercises `TicketService.ChangeStatusAsync` at the exact deadline and confirms a later breach scan records nothing.
+- Worker tests now check the configured 60-second timer interval and stop the hosted service in `finally` blocks. The SLA collection test follows pagination instead of assuming the Ticket is in the first 100 results, and the policy unit test compares Tickets created under the original and later policies.
+- Full solution validation after these changes: 366 tests passed, 0 failed, 0 skipped; build passed with 0 warnings and 0 errors; Slopwatch reported 0 issues; `git diff --check` found no whitespace errors. The previous 354-test and review-open notes above are historical snapshots, not the current result.
+- The user approved publication. The final release rerun passed 366/366 tests and Slopwatch found 0 issues; `git diff --check` found no whitespace errors. The `v3.0.0` tag identifies the published release commit; `.tool-appdata/` remains uncommitted.
 
 ### AUTH-002 - Verify Email Ownership End to End
 

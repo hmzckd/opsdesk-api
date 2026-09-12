@@ -19,6 +19,25 @@ public sealed class TicketRepository : ITicketRepository
     }
 
     /// <summary>
+    /// Keeps one multi-step write workflow inside one commit or rollback boundary.
+    /// </summary>
+    public async Task<TResult> ExecuteInWriteTransactionAsync<TResult>(
+        Func<CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+
+        await using var transaction =
+            await _dbContext.Database.BeginTransactionAsync(
+                cancellationToken);
+
+        TResult result = await operation(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return result;
+    }
+
+    /// <summary>
     /// Projects one bounded, read-only Ticket page inside the viewer's scope.
     /// </summary>
     public async Task<PagedResponse<TicketListItemResponse>>
@@ -273,9 +292,26 @@ public sealed class TicketRepository : ITicketRepository
                 .ToListAsync(cancellationToken);
         }
 
+        List<TicketActivityResponse> slaBreaches = await _dbContext
+            .TicketSlaBreaches
+            .AsNoTracking()
+            .Where(breach => breach.TicketId == ticketId)
+            .Select(breach => new TicketActivityResponse(
+                breach.Id,
+                TicketActivityType.SlaBreached,
+                null,
+                breach.DetectedAtUtc,
+                null,
+                null,
+                null,
+                null,
+                null))
+            .ToListAsync(cancellationToken);
+
         return comments
             .Concat(statusChanges)
             .Concat(assignmentChanges)
+            .Concat(slaBreaches)
             .OrderBy(item => item.CreatedAtUtc)
             .ThenBy(item => item.Type)
             .ThenBy(item => item.Id)
@@ -377,43 +413,73 @@ public sealed class TicketRepository : ITicketRepository
     /// <summary>
     /// Retrieves one Ticket with change tracking for a write operation.
     /// </summary>
-    public Task<Ticket?> GetForUpdateAsync(
+    public async Task<Ticket?> GetForUpdateAsync(
         Guid ticketId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.Tickets.SingleOrDefaultAsync(
-            ticket => ticket.Id == ticketId,
-            cancellationToken);
+        if (_dbContext.Database.CurrentTransaction is null)
+        {
+            return await _dbContext.Tickets.SingleOrDefaultAsync(
+                ticket => ticket.Id == ticketId,
+                cancellationToken);
+        }
+
+        List<Ticket> tickets = await _dbContext.Tickets
+            .FromSqlInterpolated(
+                $"SELECT * FROM tickets WHERE id = {ticketId} FOR UPDATE")
+            .ToListAsync(cancellationToken);
+
+        return tickets.SingleOrDefault();
     }
 
     /// <summary>
     /// Retrieves one requester-owned Ticket with write tracking enabled.
     /// </summary>
-    public Task<Ticket?> GetForUpdateForRequesterAsync(
+    public async Task<Ticket?> GetForUpdateForRequesterAsync(
         Guid ticketId,
         Guid requesterId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.Tickets.SingleOrDefaultAsync(
-            ticket =>
-                ticket.Id == ticketId &&
-                ticket.RequesterId == requesterId,
-            cancellationToken);
+        if (_dbContext.Database.CurrentTransaction is null)
+        {
+            return await _dbContext.Tickets.SingleOrDefaultAsync(
+                ticket =>
+                    ticket.Id == ticketId &&
+                    ticket.RequesterId == requesterId,
+                cancellationToken);
+        }
+
+        List<Ticket> tickets = await _dbContext.Tickets
+            .FromSqlInterpolated(
+                $"SELECT * FROM tickets WHERE id = {ticketId} AND requester_id = {requesterId} FOR UPDATE")
+            .ToListAsync(cancellationToken);
+
+        return tickets.SingleOrDefault();
     }
 
     /// <summary>
     /// Retrieves only an Agent-owned Ticket for a tracked write operation.
     /// </summary>
-    public Task<Ticket?> GetForUpdateAssignedToAgentAsync(
+    public async Task<Ticket?> GetForUpdateAssignedToAgentAsync(
         Guid ticketId,
         Guid agentId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.Tickets.SingleOrDefaultAsync(
-            ticket =>
-                ticket.Id == ticketId &&
-                ticket.AssigneeId == agentId,
-            cancellationToken);
+        if (_dbContext.Database.CurrentTransaction is null)
+        {
+            return await _dbContext.Tickets.SingleOrDefaultAsync(
+                ticket =>
+                    ticket.Id == ticketId &&
+                    ticket.AssigneeId == agentId,
+                cancellationToken);
+        }
+
+        List<Ticket> tickets = await _dbContext.Tickets
+            .FromSqlInterpolated(
+                $"SELECT * FROM tickets WHERE id = {ticketId} AND assignee_id = {agentId} FOR UPDATE")
+            .ToListAsync(cancellationToken);
+
+        return tickets.SingleOrDefault();
     }
 
     /// <summary>

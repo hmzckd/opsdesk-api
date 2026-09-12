@@ -5,11 +5,13 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using OpsDesk.Application.Auth.DTOs;
 using OpsDesk.Application.Tickets.DTOs;
 using OpsDesk.Domain.Enums;
+using OpsDesk.Infrastructure.Persistence;
 
 namespace OpsDesk.Tests.Integration;
 
@@ -104,20 +106,165 @@ public sealed class TicketSlaIntegrationTests
             ticketDetails.SlaDeadlineUtc);
         Assert.True(ticketDetails.IsSlaBreached);
 
-        TicketListEnvelope ticketPage =
-            await client.GetFromJsonAsync<TicketListEnvelope>(
-                "/tickets?pageSize=100",
-                JsonOptions)
-            ?? throw new InvalidOperationException(
-                "Ticket list body was empty.");
+        TicketListItemResponse? listedTicket = null;
+        int page = 1;
 
-        TicketListItemResponse listedTicket = ticketPage.Items
-            .Single(ticket => ticket.Id == createdTicket.Id);
+        while (listedTicket is null)
+        {
+            TicketListEnvelope ticketPage =
+                await client.GetFromJsonAsync<TicketListEnvelope>(
+                    $"/tickets?page={page}&pageSize=100",
+                    JsonOptions)
+                ?? throw new InvalidOperationException(
+                    "Ticket list body was empty.");
 
+            listedTicket = ticketPage.Items.SingleOrDefault(
+                ticket => ticket.Id == createdTicket.Id);
+
+            if (!ticketPage.HasNextPage)
+            {
+                break;
+            }
+
+            page++;
+        }
+
+        Assert.NotNull(listedTicket);
         Assert.Equal(
             createdTicket.SlaDeadlineUtc,
             listedTicket.SlaDeadlineUtc);
         Assert.True(listedTicket.IsSlaBreached);
+    }
+
+    /// <summary>
+    /// Verifies a client-supplied deadline cannot replace the server calculation.
+    /// </summary>
+    [Fact]
+    public async Task Client_should_not_override_ticket_sla_deadline()
+    {
+        DateTimeOffset createdAtUtc = new(
+            2026,
+            9,
+            11,
+            12,
+            0,
+            0,
+            TimeSpan.Zero);
+        var clock = new MutableTimeProvider(createdAtUtc);
+
+        using WebApplicationFactory<Program> timedFactory =
+            _factory.WithWebHostBuilder(builder =>
+                builder.ConfigureServices(services =>
+                {
+                    services.RemoveAll<TimeProvider>();
+                    services.AddSingleton<TimeProvider>(clock);
+                }));
+        using HttpClient client = timedFactory.CreateClient();
+        AuthResponse admin = await LoginAsAdminAsync(client);
+        _factory.VerifyAccount(admin.AccessToken);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", admin.AccessToken);
+        DateTime attemptedDeadlineUtc =
+            createdAtUtc.AddYears(10).UtcDateTime;
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/tickets",
+            new
+            {
+                title = "Client deadline override attempt",
+                description = "The API must calculate its own SLA deadline.",
+                priority = "urgent",
+                slaDeadlineUtc = attemptedDeadlineUtc
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        TicketResponse ticket = await response.Content
+            .ReadFromJsonAsync<TicketResponse>(JsonOptions)
+            ?? throw new InvalidOperationException(
+                "Ticket response body was empty.");
+
+        Assert.Equal(
+            createdAtUtc.AddHours(24).UtcDateTime,
+            ticket.SlaDeadlineUtc);
+        Assert.NotEqual(attemptedDeadlineUtc, ticket.SlaDeadlineUtc);
+    }
+
+    /// <summary>
+    /// Verifies a persisted policy edit does not recalculate an existing Ticket.
+    /// </summary>
+    [Fact]
+    public async Task Existing_ticket_should_keep_deadline_after_policy_update()
+    {
+        using HttpClient client = _factory.CreateClient();
+        AuthResponse admin = await LoginAsAdminAsync(client);
+        _factory.VerifyAccount(admin.AccessToken);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", admin.AccessToken);
+
+        HttpResponseMessage createResponse = await client.PostAsJsonAsync(
+            "/tickets",
+            new CreateTicketRequest(
+                "Persisted SLA snapshot",
+                "Existing tickets must keep their original deadline.",
+                TicketPriority.High),
+            JsonOptions);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        TicketResponse createdTicket = await createResponse.Content
+            .ReadFromJsonAsync<TicketResponse>(JsonOptions)
+            ?? throw new InvalidOperationException(
+                "Ticket response body was empty.");
+
+        Guid slaPolicyId;
+        int originalDurationMinutes;
+
+        await using (AsyncServiceScope scope =
+            _factory.Services.CreateAsyncScope())
+        {
+            OpsDeskDbContext dbContext = scope.ServiceProvider
+                .GetRequiredService<OpsDeskDbContext>();
+            slaPolicyId = await dbContext.Tickets
+                .Where(ticket => ticket.Id == createdTicket.Id)
+                .Select(ticket => ticket.SlaPolicyId)
+                .SingleAsync();
+            originalDurationMinutes = await dbContext.SlaPolicies
+                .Where(policy => policy.Id == slaPolicyId)
+                .Select(policy => policy.ResolutionDurationMinutes)
+                .SingleAsync();
+
+            await dbContext.SlaPolicies
+                .Where(policy => policy.Id == slaPolicyId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    policy => policy.ResolutionDurationMinutes,
+                    originalDurationMinutes + 60));
+        }
+
+        try
+        {
+            TicketResponse existingTicket = await client
+                .GetFromJsonAsync<TicketResponse>(
+                    $"/tickets/{createdTicket.Id}",
+                    JsonOptions)
+                ?? throw new InvalidOperationException(
+                    "Ticket details body was empty.");
+
+            Assert.Equal(
+                createdTicket.SlaDeadlineUtc,
+                existingTicket.SlaDeadlineUtc,
+                TimeSpan.FromMilliseconds(1));
+        }
+        finally
+        {
+            await using AsyncServiceScope scope =
+                _factory.Services.CreateAsyncScope();
+            OpsDeskDbContext dbContext = scope.ServiceProvider
+                .GetRequiredService<OpsDeskDbContext>();
+
+            await dbContext.SlaPolicies
+                .Where(policy => policy.Id == slaPolicyId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    policy => policy.ResolutionDurationMinutes,
+                    originalDurationMinutes));
+        }
     }
 
     /// <summary>
@@ -156,7 +303,8 @@ public sealed class TicketSlaIntegrationTests
     }
 
     private sealed record TicketListEnvelope(
-        IReadOnlyList<TicketListItemResponse> Items);
+        IReadOnlyList<TicketListItemResponse> Items,
+        bool HasNextPage);
 
     private sealed class MutableTimeProvider(
         DateTimeOffset utcNow) : TimeProvider
