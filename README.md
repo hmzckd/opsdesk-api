@@ -96,6 +96,7 @@ tests/OpsDesk.Tests         Unit and API integration tests
 | `GET` | `/me` | Authenticated | Read the current token identity |
 | `POST` | `/admin/invitations` | Admin | Invite a Customer or Agent without exposing the raw token in the API response |
 | `POST` | `/admin/agents` | Admin | Provision an Agent account with validated credentials |
+| `GET` | `/admin/audit-logs` | Admin | Read filtered, paginated critical-change records |
 | `POST` | `/tickets` | Authenticated | Create a Ticket for the current user |
 | `GET` | `/tickets` | Authenticated | List visible Tickets with optional paging, filtering, and sorting |
 | `GET` | `/tickets/{id}` | Authenticated and visible | Read one Ticket without leaking protected Tickets |
@@ -134,6 +135,20 @@ GET /tickets?unassigned=true&sortBy=priority&sortDirection=desc
 ```
 
 The response contains compact Ticket items plus `page`, `pageSize`, `totalCount`, `totalPages`, `hasPreviousPage`, and `hasNextPage` metadata.
+
+## Audit Log Query
+
+`GET /admin/audit-logs` returns the newest records first. It accepts optional `action`, `actorId`, `targetType`, `targetId`, `fromUtc`, `toUtc`, `page`, and `pageSize` filters. `targetId` requires `targetType`. Page size defaults to 20 and is limited to 100. `fromUtc` is inclusive, `toUtc` is exclusive, and both require an explicit UTC offset (`Z` or `+00:00`).
+
+```http
+GET /admin/audit-logs?action=ticket_status_changed&targetType=ticket&page=1&pageSize=20
+```
+
+An entry contains the action, authenticated actor ID, affected object type and ID, UTC time, and only applicable status or assignee before/after values. It never contains Ticket text, email addresses, passwords, or invitation tokens. `invitation_created` means the invitation was stored, not that email delivery was confirmed; failed delivery produces a separate `invitation_revoked` entry.
+
+Page-number results are stable while the matching records are unchanged. New records between page requests can shift later pages; clients should not treat successive pages as a snapshot.
+
+An invitation becomes usable only after the email sender reports success and that fact is saved in PostgreSQL. If SMTP fails while PostgreSQL is unavailable, revocation may fail and the pending invitation may still block a new one, but its link cannot be accepted. A successful email send followed by a database failure also leaves the link unusable. Existing invitations created before this migration have no recorded delivery and therefore cannot be accepted; an Admin must issue a new invitation after the old one is revoked or expires. Automatic retry is not part of this version.
 
 ## Email Input Contract
 
@@ -348,6 +363,8 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - A Ticket snapshots its active priority policy and UTC resolution deadline when created; later policy changes and reopen operations do not recalculate that deadline.
 - Current SLA breach state is derived from the stored deadline and resolution or observation time instead of persisting a time-sensitive boolean.
 - A configurable background worker atomically stores at most one durable SLA breach event per Ticket; the event appears in authorized activity timelines with no User actor.
+- Critical Ticket, Agent, and invitation writes save allowlisted Admin-only audit records with their database changes; the separate Ticket activity timeline is unchanged.
+- Audit entries have no update or delete API. This is not a claim of database-level tamper resistance, and SMTP delivery is not part of a database transaction.
 - Global exception handling maps expected failures to consistent API responses.
 
 ## Roadmap
@@ -355,7 +372,9 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - `V2.0`: Ticket creation, visibility, lifecycle, and status history
 - `V2.1`: Ticket comments, assignment, and activity timeline
 - `V2.2`: Ticket filtering, sorting, and pagination
-- `V3`: SLA policies and deadlines, followed by audit logs, approvals, and background jobs
+- `V3.0`: SLA policies, deadlines, and background breach detection
+- `V3.1`: Admin audit logs for critical changes
+- `V3.2`: Approval workflows (planned)
 - `V4`: Human-approved .NET AI triage and summarization
 - `V5`: Optional Python worker for embeddings, similarity search, and reranking
 

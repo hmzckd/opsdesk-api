@@ -22,6 +22,7 @@ public sealed class UserInvitationConfiguration : IEntityTypeConfiguration<UserI
         builder.Property(x => x.TokenHash).HasColumnName("token_hash").HasMaxLength(64).IsRequired();
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
         builder.Property(x => x.ExpiresAtUtc).HasColumnName("expires_at_utc");
+        builder.Property(x => x.EmailSentAtUtc).HasColumnName("email_sent_at_utc");
         builder.Property(x => x.RevokedAtUtc).HasColumnName("revoked_at_utc");
         builder.Property(x => x.AcceptedAtUtc).HasColumnName("accepted_at_utc");
         builder.Property(x => x.AcceptedUserId).HasColumnName("accepted_user_id");

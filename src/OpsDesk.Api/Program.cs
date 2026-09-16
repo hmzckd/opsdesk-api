@@ -13,6 +13,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OpsDesk.Application.Agents.Interfaces;
 using OpsDesk.Application.Agents.Services;
+using OpsDesk.Application.Audit.Interfaces;
+using OpsDesk.Application.Audit.Services;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Auth.Services;
 using OpsDesk.Application.Tickets.Interfaces;
@@ -52,6 +54,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSingleton<TimeProvider>(
     TimeProvider.System);
 builder.Services.AddScoped<IAgentService, AgentService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAuthSessionService, AuthSessionService>();
 builder.Services.AddScoped<IExternalSignInService, ExternalSignInService>();

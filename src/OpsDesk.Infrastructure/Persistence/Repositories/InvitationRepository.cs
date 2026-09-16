@@ -100,13 +100,46 @@ public sealed class InvitationRepository(
         }
     }
 
-    // Keeps an unsuccessful invitation as history while releasing its pending-email slot.
-    public async Task RevokeAsync(Guid invitationId, DateTime revokedAtUtc,
+    // A failed database write leaves the already-sent link unusable rather than activating it implicitly.
+    public async Task MarkEmailSentAsync(Guid invitationId, DateTime sentAtUtc,
         CancellationToken cancellationToken = default)
     {
-        await database.UserInvitations.Where(x => x.Id == invitationId
+        if (sentAtUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException("Email send time must be UTC.", nameof(sentAtUtc));
+        }
+
+        int updated = await database.UserInvitations
+            .Where(x => x.Id == invitationId && x.EmailSentAtUtc == null
+                && x.RevokedAtUtc == null && x.AcceptedAtUtc == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                x => x.EmailSentAtUtc, sentAtUtc), cancellationToken);
+        if (updated != 1)
+        {
+            throw new InvalidOperationException("The invitation could not be activated after email delivery.");
+        }
+    }
+
+    // Keeps an unsuccessful invitation as history while releasing its pending-email slot.
+    public async Task RevokeAsync(Guid invitationId, DateTime revokedAtUtc,
+        AuditLog auditLog,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(auditLog);
+        await using var transaction = await database.Database
+            .BeginTransactionAsync(cancellationToken);
+
+        int revoked = await database.UserInvitations.Where(x => x.Id == invitationId
                 && x.RevokedAtUtc == null && x.AcceptedAtUtc == null)
             .ExecuteUpdateAsync(setters => setters.SetProperty(
                 x => x.RevokedAtUtc, revokedAtUtc), cancellationToken);
+
+        if (revoked == 1)
+        {
+            database.AuditLogs.Add(auditLog);
+            await database.SaveChangesAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
     }
 }

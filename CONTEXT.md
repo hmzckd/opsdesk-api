@@ -70,6 +70,10 @@ _Avoid_: Internal note, audit entry
 A chronological read view that combines existing Ticket Comments, Ticket Status Changes, system-generated SLA Breaches, and role-appropriate Ticket Assignment Changes. It is not a separate permanent record. Customers see public activity only; Agents and Admins can also see internal assignment activity. A system-generated item has no User actor.
 _Avoid_: Audit log, activity table
 
+**Audit Log**:
+An Admin-only record of who made a significant operational change, what was affected, and when it happened. It records successful database changes rather than claiming that an external email was delivered. It is separate from the Ticket Activity Timeline and never contains passwords or tokens.
+_Avoid_: Ticket activity, email delivery receipt
+
 **Ticket Priority**:
 The operational urgency assigned to a Ticket. V2 supports Low, Medium, High, and Urgent priority.
 _Avoid_: Severity, importance

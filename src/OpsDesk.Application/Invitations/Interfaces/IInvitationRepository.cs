@@ -15,7 +15,11 @@ public interface IInvitationRepository
     // Atomically retires expired invitations and persists a new pending invitation.
     Task AddAsync(UserInvitation invitation, CancellationToken cancellationToken = default);
 
+    // Activates the invitation only after the email sender reports success.
+    Task MarkEmailSentAsync(Guid invitationId, DateTime sentAtUtc,
+        CancellationToken cancellationToken = default);
+
     // Retires an undelivered invitation so the admin can retry safely.
-    Task RevokeAsync(Guid invitationId, DateTime revokedAtUtc,
+    Task RevokeAsync(Guid invitationId, DateTime revokedAtUtc, AuditLog auditLog,
         CancellationToken cancellationToken = default);
 }

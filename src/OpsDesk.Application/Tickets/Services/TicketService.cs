@@ -1,4 +1,5 @@
 using System.Text.Json;
+using OpsDesk.Application.Audit.Interfaces;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Application.Common.Pagination;
@@ -17,17 +18,20 @@ public sealed class TicketService : ITicketService
     private readonly IUserRepository _userRepository;
     private readonly ISlaPolicyRepository _slaPolicyRepository;
     private readonly TimeProvider _timeProvider;
+    private readonly IAuditLogRepository _auditLogs;
 
     public TicketService(
         ITicketRepository ticketRepository,
         IUserRepository userRepository,
         ISlaPolicyRepository slaPolicyRepository,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IAuditLogRepository auditLogs)
     {
         _ticketRepository = ticketRepository;
         _userRepository = userRepository;
         _slaPolicyRepository = slaPolicyRepository;
         _timeProvider = timeProvider;
+        _auditLogs = auditLogs;
     }
 
     /// <summary>
@@ -254,6 +258,10 @@ public sealed class TicketService : ITicketService
             assignmentChange,
             cancellationToken);
 
+        _auditLogs.Stage(AuditLog.ForTicketAssigneeChanged(
+            ticket.Id, actorId, previousAssigneeId,
+            ticket.AssigneeId, changedAtUtc));
+
         await _ticketRepository.SaveChangesAsync(cancellationToken);
 
         return MapToResponse(ticket);
@@ -326,6 +334,10 @@ public sealed class TicketService : ITicketService
         await _ticketRepository.AddAssignmentChangeAsync(
             assignmentChange,
             cancellationToken);
+
+        _auditLogs.Stage(AuditLog.ForTicketAssigneeChanged(
+            ticket.Id, actorId, previousAssigneeId,
+            ticket.AssigneeId, changedAtUtc));
 
         await _ticketRepository.SaveChangesAsync(cancellationToken);
 
@@ -498,6 +510,10 @@ public sealed class TicketService : ITicketService
             statusChange,
             cancellationToken);
 
+        _auditLogs.Stage(AuditLog.ForTicketStatusChanged(
+            ticket.Id, requesterId, previousStatus,
+            ticket.Status, reopenedAtUtc));
+
         await _ticketRepository.SaveChangesAsync(cancellationToken);
 
         return new ReopenTicketResponse(
@@ -665,6 +681,10 @@ public sealed class TicketService : ITicketService
             statusChange,
             cancellationToken);
 
+        _auditLogs.Stage(AuditLog.ForTicketStatusChanged(
+            ticket.Id, actorId, previousStatus,
+            ticket.Status, changedAtUtc));
+
         await _ticketRepository.SaveChangesAsync(cancellationToken);
 
         return MapToResponse(ticket);
@@ -718,6 +738,9 @@ public sealed class TicketService : ITicketService
             slaPolicy,
             createdAtUtc,
             priority);
+
+        _auditLogs.Stage(AuditLog.ForTicketCreated(
+            ticket.Id, requesterId, createdAtUtc));
 
         await _ticketRepository.AddAsync(
             ticket,

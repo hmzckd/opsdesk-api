@@ -1,5 +1,6 @@
 using OpsDesk.Application.Agents.DTOs;
 using OpsDesk.Application.Agents.Interfaces;
+using OpsDesk.Application.Audit.Interfaces;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Auth.Services;
 using OpsDesk.Application.Common.Exceptions;
@@ -14,17 +15,20 @@ public sealed class AgentService : IAgentService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IPasswordValidator _passwordValidator;
     private readonly IEmailValidator _emailValidator;
+    private readonly IAuditLogRepository _auditLogs;
 
     public AgentService(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
         IPasswordValidator passwordValidator,
-        IEmailValidator emailValidator)
+        IEmailValidator emailValidator,
+        IAuditLogRepository auditLogs)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _passwordValidator = passwordValidator;
         _emailValidator = emailValidator;
+        _auditLogs = auditLogs;
     }
 
     /// <summary>
@@ -33,9 +37,14 @@ public sealed class AgentService : IAgentService
     /// </summary>
     public async Task<AgentResponse> CreateAsync(
         CreateAgentRequest request,
+        Guid actorId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (actorId == Guid.Empty)
+        {
+            throw new ArgumentException("Actor ID cannot be empty.", nameof(actorId));
+        }
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Email);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Password);
 
@@ -72,6 +81,9 @@ public sealed class AgentService : IAgentService
                 request.Password),
             Role = UserRole.Agent
         };
+
+        _auditLogs.Stage(AuditLog.ForAgentCreated(
+            agent.Id, actorId, agent.CreatedAtUtc));
 
         await _userRepository.AddAsync(
             agent,

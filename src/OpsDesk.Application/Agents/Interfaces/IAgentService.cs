@@ -9,5 +9,6 @@ public interface IAgentService
     /// </summary>
     Task<AgentResponse> CreateAsync(
         CreateAgentRequest request,
+        Guid actorId,
         CancellationToken cancellationToken = default);
 }

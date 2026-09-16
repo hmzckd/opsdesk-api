@@ -1,5 +1,6 @@
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Auth.Services;
+using OpsDesk.Application.Audit.Interfaces;
 using OpsDesk.Application.Common.Exceptions;
 using OpsDesk.Application.Invitations.DTOs;
 using OpsDesk.Application.Invitations.Interfaces;
@@ -17,6 +18,7 @@ public sealed class InvitationService(
     IEmailValidator emailValidator,
     IPasswordValidator passwordValidator,
     IPasswordHasher passwordHasher,
+    IAuditLogRepository auditLogs,
     TimeProvider timeProvider) : IInvitationService
 {
     // Validates recipient input, binds identity to the invitation, and atomically creates the account.
@@ -84,6 +86,8 @@ public sealed class InvitationService(
         UserInvitation invitation = UserInvitation.Create(
             email, request.Role, invitedById, token.TokenHash,
             timeProvider.GetUtcNow().UtcDateTime);
+        auditLogs.Stage(AuditLog.ForInvitationCreated(
+            invitation.Id, invitedById, invitation.CreatedAtUtc));
         await invitations.AddAsync(invitation, cancellationToken);
 
         try
@@ -95,10 +99,18 @@ public sealed class InvitationService(
         catch
         {
             // A failed delivery must not leave an active invitation blocking a retry.
-            await invitations.RevokeAsync(invitation.Id,
-                timeProvider.GetUtcNow().UtcDateTime, CancellationToken.None);
+            DateTime revokedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
+            await invitations.RevokeAsync(
+                invitation.Id,
+                revokedAtUtc,
+                AuditLog.ForInvitationRevoked(
+                    invitation.Id, invitedById, revokedAtUtc),
+                CancellationToken.None);
             throw;
         }
+
+        await invitations.MarkEmailSentAsync(
+            invitation.Id, timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
 
         return new InvitationResponse(invitation.Id, invitation.Email,
             invitation.Role, invitation.InvitedById,

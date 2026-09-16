@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OpsDesk.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using OpsDesk.Infrastructure.Persistence;
 namespace OpsDesk.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(OpsDeskDbContext))]
-    partial class OpsDeskDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913004815_AddAuditLogs")]
+    partial class AddAuditLogs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,10 +78,6 @@ namespace OpsDesk.Infrastructure.Persistence.Migrations
                     b.HasIndex("OccurredAtUtc", "Id")
                         .IsDescending()
                         .HasDatabaseName("ix_audit_logs_occurred_id");
-
-                    b.HasIndex("Action", "OccurredAtUtc", "Id")
-                        .IsDescending(false, true, true)
-                        .HasDatabaseName("ix_audit_logs_action_occurred_id");
 
                     b.HasIndex("ActorId", "OccurredAtUtc", "Id")
                         .IsDescending(false, true, true)
@@ -591,10 +590,6 @@ namespace OpsDesk.Infrastructure.Persistence.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)")
                         .HasColumnName("email");
-
-                    b.Property<DateTime?>("EmailSentAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("email_sent_at_utc");
 
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone")

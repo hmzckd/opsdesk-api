@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using OpsDesk.Application.Audit.Interfaces;
 using OpsDesk.Application.Auth.Interfaces;
 using OpsDesk.Application.Invitations.Interfaces;
 using OpsDesk.Application.Sla.Interfaces;
@@ -54,6 +55,7 @@ public static class DependencyInjection
             IEmailVerificationTokenRepository,
             EmailVerificationTokenRepository>();
         services.AddScoped<ITicketRepository, TicketRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<ISlaPolicyRepository, SlaPolicyRepository>();
         services.AddScoped<ISlaBreachRepository, SlaBreachRepository>();
         services.AddScoped<AdminUserSeeder>();

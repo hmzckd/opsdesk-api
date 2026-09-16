@@ -11,13 +11,14 @@ public sealed class UserInvitation
     public string TokenHash { get; private set; } = string.Empty;
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime ExpiresAtUtc { get; private set; }
+    public DateTime? EmailSentAtUtc { get; private set; }
     public DateTime? RevokedAtUtc { get; private set; }
     public DateTime? AcceptedAtUtc { get; private set; }
     public Guid? AcceptedUserId { get; private set; }
 
     private UserInvitation() { }
 
-    // A revoked, consumed, not-yet-valid, or expired invitation cannot create an account.
+    // Only a delivered, unrevoked, unused invitation within its lifetime can create an account.
     public bool CanAcceptAt(DateTime acceptedAtUtc)
     {
         if (acceptedAtUtc.Kind != DateTimeKind.Utc)
@@ -25,7 +26,7 @@ public sealed class UserInvitation
             throw new ArgumentException("Acceptance time must be UTC.", nameof(acceptedAtUtc));
         }
 
-        return RevokedAtUtc is null && AcceptedAtUtc is null
+        return EmailSentAtUtc is not null && RevokedAtUtc is null && AcceptedAtUtc is null
             && acceptedAtUtc >= CreatedAtUtc && acceptedAtUtc < ExpiresAtUtc;
     }
 

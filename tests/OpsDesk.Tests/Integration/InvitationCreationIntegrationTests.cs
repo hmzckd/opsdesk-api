@@ -168,6 +168,58 @@ public sealed class InvitationCreationIntegrationTests(OpsDeskApiFixture fixture
         Assert.Equal(HttpStatusCode.Created, retry.StatusCode);
     }
 
+    // A recipient cannot use a token while its email delivery is still in progress.
+    [Fact]
+    public async Task Invitation_should_be_unusable_until_delivery_succeeds()
+    {
+        var sender = new AcceptanceDuringDeliverySender();
+        using var factory = fixture.Factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IInvitationEmailSender>();
+            services.AddSingleton<IInvitationEmailSender>(sender);
+        }));
+        using HttpClient client = factory.CreateClient();
+        sender.Client = client;
+        await LoginAsAdminAsync(client);
+        string email = $"pending-{Guid.NewGuid():N}@example.com";
+
+        using HttpResponseMessage created = await client.PostAsJsonAsync(
+            "/admin/invitations", new { email, role = "agent" });
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, sender.AcceptanceBeforeDelivery);
+        using HttpResponseMessage accepted = await client.PostAsJsonAsync(
+            "/auth/invitations/accept", new
+            {
+                token = sender.RawToken,
+                firstName = "Invited",
+                lastName = "Agent",
+                password = "ValidPass!"
+            });
+        Assert.Equal(HttpStatusCode.Created, accepted.StatusCode);
+    }
+
+    private sealed class AcceptanceDuringDeliverySender : IInvitationEmailSender
+    {
+        public HttpClient? Client { get; set; }
+        public string? RawToken { get; private set; }
+        public HttpStatusCode? AcceptanceBeforeDelivery { get; private set; }
+
+        public async Task SendAsync(InvitationEmail email, CancellationToken cancellationToken = default)
+        {
+            RawToken = email.RawToken;
+            using HttpResponseMessage response = await (Client ?? throw new InvalidOperationException())
+                .PostAsJsonAsync("/auth/invitations/accept", new
+                {
+                    token = email.RawToken,
+                    firstName = "Early",
+                    lastName = "Recipient",
+                    password = "ValidPass!"
+                }, cancellationToken);
+            AcceptanceBeforeDelivery = response.StatusCode;
+        }
+    }
+
     private sealed class InvitationTestClock(DateTimeOffset now) : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = now;

@@ -23,10 +23,16 @@
 | `AUTH` | Authentication, identity, and onboarding |
 | `V3-D` | V3 product and domain contract decisions |
 | `V30` | V3 implementation work |
+| `V31-D` | V3.1 product and domain contract decisions |
+| `V31` | V3.1 audit implementation work |
 
 ## Current Queue
 
-No queued tasks.
+| Order | Task | Status | Dependency |
+| ---: | --- | --- | --- |
+| 1 | [V31-001 - Record Critical Changes](#v31-001---record-critical-changes) | Review | V31-D01 |
+| 2 | [V31-002 - Read the Admin Audit Log](#v31-002---read-the-admin-audit-log) | Review | V31-001 |
+| 3 | [REL-310 - Validate and Release v3.1.0](#rel-310---validate-and-release-v310) | Review | V31-002 |
 
 ## Completed Tasks
 
@@ -66,6 +72,7 @@ No queued tasks.
 | V3-D02 - Define SLA Breach Monitoring Contract | 2026-09-11T11:42:14.3208976Z | Local task |
 | V30-002 - Detect and Persist SLA Breaches | 2026-09-11T16:29:10.7422909Z | Local task |
 | REL-300 - Validate and Release v3.0.0 | 2026-09-12T23:14:06Z | Local task |
+| V31-D01 - Define the Audit Log Contract | 2026-09-13T00:41:26Z | Local task |
 
 ### Authentication Package Final Review - 2026-09-10
 
@@ -490,6 +497,179 @@ Then the commit is pushed and the `v3.0.0` tag points to that commit
 - Worker tests now check the configured 60-second timer interval and stop the hosted service in `finally` blocks. The SLA collection test follows pagination instead of assuming the Ticket is in the first 100 results, and the policy unit test compares Tickets created under the original and later policies.
 - Full solution validation after these changes: 366 tests passed, 0 failed, 0 skipped; build passed with 0 warnings and 0 errors; Slopwatch reported 0 issues; `git diff --check` found no whitespace errors. The previous 354-test and review-open notes above are historical snapshots, not the current result.
 - The user approved publication. The final release rerun passed 366/366 tests and Slopwatch found 0 issues; `git diff --check` found no whitespace errors. The `v3.0.0` tag identifies the published release commit; `.tool-appdata/` remains uncommitted.
+
+### V31-D01 - Define the Audit Log Contract
+
+- Local status: `Done`
+- Completed: `Yes`
+- Completed at: `2026-09-13T00:41:26Z`
+- Source: User-approved V3.1 audit scope and invitation semantics, 2026-09-13.
+- Dependency: REL-300.
+
+#### Task's Purpose
+
+Define which significant changes an Admin can inspect without confusing an Audit Log with the customer-visible Ticket Activity Timeline or an email delivery receipt.
+
+#### Current System Behavior
+
+- Ticket status and assignment changes already have Ticket-specific history; there is no cross-feature Admin audit query.
+- An Admin can provision an Agent or create an invitation. Invitation creation is persisted before email delivery is attempted; a delivery failure revokes the invitation.
+- The Ticket Activity Timeline is role-appropriate and remains separate from the Admin-only Audit Log.
+
+#### Approved Contract
+
+- Record successful database changes for Ticket creation, Ticket status changes (including reopen), Ticket assignment and unassignment, Agent account creation, invitation creation, and invitation revocation after failed delivery.
+- An invitation creation event means the invitation was persisted. It does not prove the email was delivered. If sending fails, record the subsequent revocation as a separate event.
+- Each event identifies its action, authenticated actor ID, affected object type and ID, and server-owned UTC time. Status and assignment events may also include safe previous and new values.
+- Derive the actor from the authenticated session, never from client JSON. The Agent-creation flow must gain an actor input from its Admin endpoint during implementation.
+- Allow only explicitly selected safe values. Never record passwords, password hashes, invitation tokens, email links, or arbitrary request bodies.
+- Persist a database change and its Audit Log entry atomically in the same database transaction. SMTP delivery is an external side effect and cannot be part of that transaction.
+- Expose a paginated, newest-first `GET /admin/audit-logs` read view for Admins only, with filters for action, actor, affected object, and UTC time range. Use a stable secondary order when times match.
+- Do not add Audit Log entries to the Ticket Activity Timeline. Do not expose an Audit Log update or delete API; this does not claim database-level tamper resistance.
+- Comments, failed login attempts, password reset, SLA worker events, and retention automation are outside this first scope.
+
+#### Proposed Data Flow and Layers
+
+`Controller` obtains the actor from authentication -> `Application` performs the approved operation -> `Infrastructure` persists the change and its Audit Log entry together -> an Admin reads filtered, paginated records through a separate endpoint.
+
+- Domain: name the Audit Log event and its safe action vocabulary.
+- Application: coordinate the relevant operations and define the Admin read contract without accepting an actor ID from request JSON.
+- Infrastructure: map and persist Audit Log entries with the affected write, then query them with filters and stable pagination.
+- Api: extract authenticated identity and restrict the read endpoint to Admins.
+- Tests: verify allowed events, atomicity, secret exclusion, invitation failure semantics, authorization, and pagination against PostgreSQL.
+
+#### Acceptance Scenarios
+
+```gherkin
+Given an authenticated Customer creates a Ticket successfully
+When the Ticket is saved
+Then one Audit Log entry identifies the Customer and the new Ticket
+
+Given an authorized User changes a Ticket status or assignment
+When the change is saved
+Then one Audit Log entry identifies the actor, Ticket, and safe previous and new values
+
+Given an Admin creates an Agent account
+When the account is saved
+Then one Audit Log entry identifies the Admin and Agent without containing a password or hash
+
+Given an Admin creates an invitation and email delivery fails
+When the invitation is revoked
+Then the Audit Log records invitation creation and revocation without claiming email delivery
+
+Given a database write fails
+When the operation is rolled back
+Then neither the business change nor its Audit Log entry remains
+
+Given a Customer or Agent requests the Audit Log
+When authorization is checked
+Then access is denied
+
+Given an Admin filters and pages through the Audit Log
+When entries share a timestamp and no new entries arrive between page requests
+Then each page has a stable newest-first order without duplicate or missing entries
+```
+
+#### Proposed TDD Slices
+
+1. Record Ticket creation and one status transition atomically with their Audit Log entries.
+2. Cover assignment, unassignment, and reopen without logging failed changes.
+3. Cover Agent creation and invitation creation plus revocation after failed delivery.
+4. Add Admin-only filtered, stable, paginated reading and secret-exclusion checks.
+
+#### Skills
+
+- Applied `domain-modeling` to distinguish operational audit events from Ticket activity and email delivery.
+- Applied `codebase-design` to keep the write coordination and Admin read interface focused across the existing layers.
+- Deferred `tdd` until an implementation task and public test surface are approved.
+
+#### Documented Operational Limits
+
+- Invitation acceptance now requires a persisted email-send timestamp. If SMTP fails while PostgreSQL is unavailable, revocation may fail and the pending invitation may block a replacement, but it cannot be accepted. A send-success/database-activation failure is also fail-closed. Existing invitations lack a recorded send timestamp after migration and must be replaced; automatic retry is not part of this version.
+- Page-number pagination has deterministic ordering for an unchanged result set. New audit entries between separate page requests can shift offsets; a future cursor or snapshot contract would address this.
+
+### V31-001 - Record Critical Changes
+
+- Local status: `Review`
+- Completed: `No`
+- Source: Approved V31-D01 contract and user request to implement the complete feature in slices, 2026-09-13.
+- Dependency: V31-D01.
+
+#### Task's Purpose
+
+Keep an Admin-inspectable record whenever an approved critical database change succeeds.
+
+#### Scope
+
+- Add an Audit Log entity, action vocabulary, EF mapping, and migration.
+- Record Ticket creation, status change/reopen, assignment/unassignment, Agent creation, invitation creation, and revocation after email failure.
+- Keep business writes and their audit entries in the same database transaction. Do not treat SMTP delivery as transactional or record secrets.
+- Take human actor IDs from authenticated server-side identity, never request JSON.
+
+#### Acceptance
+
+- The approved V31-D01 Given/When/Then scenarios for the six write categories and atomicity pass against real PostgreSQL.
+- Failed or unchanged operations do not create misleading audit entries.
+
+#### Implementation Evidence - 2026-09-13
+
+- Added the allowlisted `AuditLog` entity and action vocabulary, EF mapping, and generated `AddAuditLogs` migration. An additive `AddAuditActionIndex` migration covers the action filter; removing and regenerating the first migration was not possible because local PostgreSQL was unavailable, so no database rollback was attempted.
+- Ticket, Agent, and invitation creation stage audit entries in the same scoped EF Core save as the business row. Status, assignment, and reopen use their existing save path; invitation revocation uses its own transaction and records an event only when a row was actually revoked.
+- Agent and invitation actor IDs come from validated JWT identity, not client JSON. Integration tests cover forged actor IDs, failed audit insert rollback, failed SMTP revocation, no-op assignment, and secret exclusion.
+- The user requested implementation before tests for this turn, so the usual red-before-green TDD order was not followed; Given/When/Then scenarios still guided the later xUnit integration tests.
+
+### V31-002 - Read the Admin Audit Log
+
+- Local status: `Review`
+- Completed: `No`
+- Source: Approved V31-D01 contract, 2026-09-13.
+- Dependency: V31-001.
+
+#### Task's Purpose
+
+Let Admins inspect critical changes across Tickets, Agents, and invitations without exposing those records to Customers or Agents.
+
+#### Scope and Acceptance
+
+- Add `GET /admin/audit-logs` with stable newest-first pagination and filters for action, actor, target, and UTC range.
+- Return only safe audit fields; no password, token, email link, or raw request payload.
+- Verify Admin access, non-Admin denial, filtering, and stable ordering through API integration tests.
+
+#### Implementation Evidence - 2026-09-13
+
+- Added an Admin-only, bounded `GET /admin/audit-logs` query. Action, actor, target type/ID, and half-open UTC time-range filters are validated before EF Core receives them. Target ID requires target type; timestamps require an explicit UTC suffix.
+- PostgreSQL orders by occurrence time then ID, both descending. Indexes support overall, action, actor, and typed-target reading. Responses project only safe, fixed audit fields.
+- Seven new API integration tests pass against PostgreSQL, including Admin/Agent/Customer access, same-time pagination, invalid filters, and safe response fields.
+
+### REL-310 - Validate and Release v3.1.0
+
+- Local status: `Review`
+- Completed: `No`
+- Source: V3.1 delivery split, 2026-09-13.
+- Dependency: V31-002.
+
+#### Task's Purpose
+
+Review and validate the complete audit behavior before a separately approved Git release.
+
+#### Scope
+
+- Run build, automated tests, EF model checks, Slopwatch, and repository diff checks.
+- Review the security-sensitive event payloads and transactional failure paths.
+- Update documentation with verified behavior. Commit, push, and tag require separate user approval.
+
+#### Validation So Far - 2026-09-13
+
+- Full solution test run: 373 passed, 0 failed, 0 skipped. Build: 0 warnings and 0 errors. Slopwatch: 0 issues. EF Core reports no pending model changes after both audit migrations.
+- Local development PostgreSQL was unavailable, so the migration was not applied there. Testcontainers applied it to disposable PostgreSQL during integration tests.
+- Review of the documented SMTP-cleanup and concurrent-page-shift limits remains for the user before release. No Git operation was performed.
+
+#### Validation Update - 2026-09-16
+
+- Invitation acceptance now requires a persisted email-send timestamp. A focused HTTP test confirms that acceptance fails while delivery is in progress and succeeds after delivery; a Domain unit test first failed under the old rule and passes with the new rule.
+- The generated `RequireInvitationEmailDelivery` migration adds a nullable timestamp; legacy invitations without proof of sending remain unusable. No permanent development database was updated.
+- With Docker-backed PostgreSQL available, the full solution suite passed: 375 tests, 0 failures, 0 skipped. Build completed with 0 warnings and 0 errors. Slopwatch found 0 issues and EF Core reported no pending model changes.
+- Admin audit payloads remain allowlisted, and page-number pagination's concurrent-insert limit is documented. Git commit and push are authorized; a version tag and marking tasks Done still require separate review/approval.
 
 ### AUTH-002 - Verify Email Ownership End to End
 

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpsDesk.Application.Agents.DTOs;
@@ -31,8 +32,16 @@ public sealed class AdminAgentsController : ControllerBase
         CreateAgentRequest request,
         CancellationToken cancellationToken)
     {
+        if (!Guid.TryParse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier),
+            out Guid actorId))
+        {
+            return Unauthorized();
+        }
+
         AgentResponse response = await _agentService.CreateAsync(
             request,
+            actorId,
             cancellationToken);
 
         return StatusCode(
