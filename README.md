@@ -52,24 +52,6 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    Client["API Client / Browser / Swagger UI"] --> Api["OpsDesk.Api<br/>Controllers, authentication, HTTP responses"]
-    Client --> Identity["Corporate OIDC Provider<br/>Local development: Keycloak"]
-    Identity --> Api
-    Api --> Application["OpsDesk.Application<br/>Use cases, DTOs, interfaces, authorization decisions"]
-    Application --> Domain["OpsDesk.Domain<br/>Entities, enums, business rules"]
-
-    Api --> Infrastructure["OpsDesk.Infrastructure<br/>EF Core, JWT, hashing, seeding"]
-    Infrastructure -. "implements interfaces" .-> Application
-    Infrastructure --> Domain
-    Infrastructure --> Database[(PostgreSQL)]
-    Infrastructure --> Mail["SMTP provider<br/>Local development: Mailpit"]
-
-    Tests["OpsDesk.Tests<br/>xUnit, WebApplicationFactory, Testcontainers"] -. "exercises public API" .-> Api
-    Tests -. "temporary database" .-> Database
-```
-
 The projects are sibling directories under `src`; the arrows represent code and runtime relationships, not folder nesting. `OpsDesk.Domain` is the independent core. `OpsDesk.Application` coordinates business use cases. `OpsDesk.Infrastructure` supplies technical implementations, and `OpsDesk.Api` exposes them through HTTP.
 
 ```text
@@ -136,56 +118,6 @@ GET /tickets?unassigned=true&sortBy=priority&sortDirection=desc
 
 The response contains compact Ticket items plus `page`, `pageSize`, `totalCount`, `totalPages`, `hasPreviousPage`, and `hasNextPage` metadata.
 
-## Audit Log Query
-
-`GET /admin/audit-logs` returns the newest records first. It accepts optional `action`, `actorId`, `targetType`, `targetId`, `fromUtc`, `toUtc`, `page`, and `pageSize` filters. `targetId` requires `targetType`. Page size defaults to 20 and is limited to 100. `fromUtc` is inclusive, `toUtc` is exclusive, and both require an explicit UTC offset (`Z` or `+00:00`).
-
-```http
-GET /admin/audit-logs?action=ticket_status_changed&targetType=ticket&page=1&pageSize=20
-```
-
-An entry contains the action, authenticated actor ID, affected object type and ID, UTC time, and only applicable status or assignee before/after values. It never contains Ticket text, email addresses, passwords, or invitation tokens. `invitation_created` means the invitation was stored, not that email delivery was confirmed; failed delivery produces a separate `invitation_revoked` entry.
-
-Page-number results are stable while the matching records are unchanged. New records between page requests can shift later pages; clients should not treat successive pages as a snapshot.
-
-An invitation becomes usable only after the email sender reports success and that fact is saved in PostgreSQL. If SMTP fails while PostgreSQL is unavailable, revocation may fail and the pending invitation may still block a new one, but its link cannot be accepted. A successful email send followed by a database failure also leaves the link unusable. Existing invitations created before this migration have no recorded delivery and therefore cannot be accepted; an Admin must issue a new invitation after the old one is revoked or expires. Automatic retry is not part of this version.
-
-## Email Input Contract
-
-- Email addresses accept at most 320 characters. Surrounding whitespace is trimmed during normalization, while whitespace inside the address is rejected.
-- The domain must contain at least two non-empty labels, such as `company.com`.
-- `admin@opsdesk.local` remains valid for the development admin seed.
-- This validation checks syntax only; it does not query DNS, inspect MX records, or prove mailbox ownership.
-
-## Public Registration
-
-`Registration:PublicRegistrationEnabled` defaults to `false`. The committed `appsettings.Development.json` explicitly sets it to `true` for local development. Demo or other non-production environments must opt in; Production cannot enable it.
-
-| Environment and configuration | Behavior |
-| --- | --- |
-| Setting absent | Public registration disabled |
-| Development/demo with `true` | Existing registration and email verification flow |
-| Any environment with `false` | Valid `POST /auth/register` requests return 403 without account creation or verification email |
-| Production with `true` | Startup fails with a configuration error, before database preparation |
-
-For deployment, use the environment variable `Registration__PublicRegistrationEnabled=false` and set the actual host environment to `Production`. Treat ASP.NET Core environment selection as deployment configuration; a server incorrectly labeled Development is not detected as Production automatically. Restart the application after changing this setting. Invalid boolean values fail startup; malformed HTTP bodies can still receive model-validation 400 responses.
-
-The Application service enforces the restriction, not just the Controller or Swagger. Existing login, email confirmation, password recovery, admin invitations/acceptance, and admin Agent provisioning remain available. This switch does not remove existing users, revoke JWTs, disable password login, or configure SSO. The endpoint remains documented in Swagger.
-
-To disable public registration in your local development environment, run from the repository root and restart the API:
-
-```powershell
-dotnet user-secrets set Registration:PublicRegistrationEnabled false --project src/OpsDesk.Api
-```
-
-To remove that local override and use the committed Development setting again:
-
-```powershell
-dotnet user-secrets remove Registration:PublicRegistrationEnabled --project src/OpsDesk.Api
-```
-
-See [AUTH-004 implementation notes](docs/agents/auth-004-registration-policy.md) for method explanations and test evidence. No database migration is required for this feature.
-
 ## Corporate SSO
 
 SSO is disabled by default. OpsDesk uses standard OpenID Connect authorization code plus PKCE, while its existing JWT remains the credential used for API calls. On first SSO sign-in, the provider-verified email must match an active OpsDesk administrator invitation. The invitation supplies the local `Customer` or `Agent` role; provider role claims are deliberately ignored. Returning users are identified by the stable provider `issuer + subject` pair, not by email.
@@ -219,18 +151,6 @@ Local browser flow:
 `POST /auth/sso/logout` immediately increments the account's server-side session version, so previously issued OpsDesk JWTs stop working. Its `providerLogoutUrl` is a separate browser step that ends the Keycloak/corporate-provider session. Local logout still succeeds if the provider logout endpoint is temporarily unavailable.
 
 Keycloak `start-dev` is only a local test provider. A production deployment must use HTTPS, an exact public origin and redirect URI, an exact corporate email-domain allowlist, and a secret manager for `Sso__ClientSecret`. Configure `Sso__Enabled=true`, `Sso__Authority`, `Sso__ClientId`, `Sso__ClientSecret`, `Sso__PublicOrigin`, and `Sso__AllowedEmailDomains__0`. Never commit provider secrets or reuse the generated local values. See [AUTH-005 browser-flow notes](docs/agents/auth-005-sso-browser-flow.md) for the protocol and method explanations.
-
-## Ticket Input Contract
-
-- `title` is required and accepts at most 200 characters.
-- `description` is required and accepts at most 5,000 characters.
-- `priority` is optional and defaults to `medium`.
-- Priority values are `low`, `medium`, `high`, and `urgent`.
-- Resolution SLA durations are 7 days for `low`, 4 days for `medium`, 2 days for `high`, and 24 hours for `urgent`.
-- Ticket creation, detail, and collection responses expose `slaDeadlineUtc` and the calculated `isSlaBreached` state; clients cannot provide either value.
-- Comment content is required and accepts at most 4,000 characters.
-- Reopen reason is required and uses the same 4,000-character limit as a public comment.
-- OpenAPI publishes required fields, string limits, and enum values for API clients and frontend controls.
 
 ## Run Locally
 
@@ -374,8 +294,3 @@ The test suite covers authentication, validation, authorization, Ticket behavior
 - `V2.2`: Ticket filtering, sorting, and pagination
 - `V3.0`: SLA policies, deadlines, and background breach detection
 - `V3.1`: Admin audit logs for critical changes
-- `V3.2`: Approval workflows (planned)
-- `V4`: Human-approved .NET AI triage and summarization
-- `V5`: Optional Python worker for embeddings, similarity search, and reranking
-
-AI-assisted triage will suggest summaries, priorities, similar tickets, and routing targets. It will not change ticket state without human approval.
